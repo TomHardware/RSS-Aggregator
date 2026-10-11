@@ -1,3 +1,18 @@
+"""后台调度。
+
+要点：
+1. 任务必须自己推应用上下文。`schedule_all` 的 app_context 只在「注册任务」时生效；
+   任务真正在调度线程执行时做 `Source.query` 会抛
+   `RuntimeError: Working outside of application context`，定时抓取 100% 失败。
+2. 调度器实例放在本模块，不要放在 `app/__init__.py`：
+   否则 `import app.scheduler` 会把包属性 `app.scheduler` 覆盖成模块对象，
+   之后 `from app import scheduler` 拿到的是模块而不是调度器实例。
+3. `init_scheduler` 尊重 `scheduler.enabled`，并在调试重载器父进程里不启动
+   （否则重载器下会起两个调度器重复抓取）。多 worker 时可用
+   `RSS_AGGREGATOR_SCHEDULER=off` 只保留一个进程跑调度。
+4. 同一源限制单实例运行（max_instances=1）并合并错过的执行，避免任务堆积。
+5. v2.0.1：只调度 `enabled` 的源；`app.timezone` 真正传给调度器（原来配了不生效）。
+"""
 import logging
 import os
 
@@ -15,13 +30,30 @@ scheduler = BackgroundScheduler()
 
 
 def run_fetch(app, source_id, notify=False):
-    """调度任务入口：在调度线程里补上应用上下文后再抓取。"""
+    """调度任务入口：在调度线程里补上应用上下文后再抓取。
+
+    同样登记到任务表，这样前端轮询也能看到定时抓取的进展。
+    """
+    from app.tasks import TooManyTasks, start
+
     with app.app_context():
         source = Source.query.get(source_id)
         if source is not None and not source.enabled:
             logger.info("source=%s 已暂停，跳过本次抓取", source_id)
             return False, "Source paused"
-        return fetch_source(source_id, notify)
+
+        try:
+            task_id = start(
+                "scheduled_fetch",
+                source_id=source_id,
+                source_name=source.name if source else None,
+                max_concurrent=app.config.get("TASKS_MAX_CONCURRENT"),
+            )
+        except TooManyTasks as exc:
+            logger.warning("后台任务过多，本次定时抓取跳过: %s", exc)
+            return False, "Too many concurrent tasks"
+
+        return fetch_source(source_id, notify, task_id=task_id)
 
 
 def schedule_source(source, notify=True, app=None):

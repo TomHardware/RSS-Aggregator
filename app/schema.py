@@ -1,3 +1,14 @@
+"""数据库结构引导（轻量迁移）。
+
+`db.create_all()` 只会新建缺失的表，**不会**给已有表补列或补索引。
+所以升级时需要在这里幂等地补齐，否则老库升级后会因为少一列而直接报错：
+
+* 补列：`source.enabled`（v2.0.1 新增，用于暂停订阅源）；
+* 补索引：`article.link` 唯一索引等（v1.3 起）；
+* 清理：历史重复文章（同一 link 只保留 id 最小的一条）。
+
+请在应用上下文内调用：`with app.app_context(): ensure_schema(app)`。
+"""
 import logging
 
 from sqlalchemy import inspect, text

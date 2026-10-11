@@ -1,3 +1,11 @@
+"""邮件通知。
+
+修复要点：
+1. `to_addr` 支持多个收件人（英文逗号/分号分隔）。原来把整串当成一个地址塞进
+   `[to_addr]`，配多个收件人时发信必然失败。
+2. 只有配置完整才发信，并显式 ehlo；发送失败返回 False 而不是静默。
+3. `MIMEMultipart()` 补上 subtype，避免生成不规范邮件。
+"""
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart

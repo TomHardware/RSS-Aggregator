@@ -1,3 +1,12 @@
+"""端到端验证：调试重载器下调度器只会启动一次。
+
+`flask run --debug` 会派生父/子两个进程，两者都会导入 main.py 并执行引导逻辑。
+如果判断不严，父进程也会启动一个调度器 → 同一批源被抓取两次、通知重复发送。
+
+用法：
+    python tests/test_debug_reloader.py [项目根目录]
+输出调度器启动次数；1 = 正确，2 = 重复启动（缺陷）。
+"""
 import os
 import re
 import subprocess
@@ -49,8 +58,7 @@ proc = subprocess.Popen(
     [PYTHON, "-m", "flask", "--app", "main", "run", "--debug",
      "--host", "127.0.0.1", "--port", str(PORT)],
     cwd=workdir, env=env,
-    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-    errors="replace", bufsize=1,
+    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
 )
 
 output = []

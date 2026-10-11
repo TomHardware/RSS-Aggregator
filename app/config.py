@@ -1,3 +1,15 @@
+"""配置加载：YAML → Flask 配置。
+
+修复要点：
+1. 原来 `_load_config` 把配置写在**实例属性**上，而 `get()` / `to_flask_config()`
+   读的是**类属性** `cls._config`（永远是 None），于是：
+     - `ConfigLoader.get()` 恒返回默认值；
+     - `to_flask_config()` 在 `'server' in cls._config` 处抛
+       `TypeError: argument of type 'NoneType' is not iterable`，应用直接起不来。
+   现在统一用类属性承载配置，并支持按路径重新加载。
+2. 相对 SQLite 路径锚定到项目根目录，避免 Flask-SQLAlchemy 3.x 把它塞进
+   instance 目录（容器里会导致数据不在挂载卷上）。
+"""
 import logging
 import os
 import re
@@ -199,6 +211,11 @@ class ConfigLoader:
         )
         flask_config["RETENTION_MAX_AGE_DAYS"] = as_int(
             "retention", "max_age_days", retention.get("max_age_days"), 0, minimum=0
+        )
+
+        task_section = section("tasks")
+        flask_config["TASKS_MAX_CONCURRENT"] = as_int(
+            "tasks", "max_concurrent", task_section.get("max_concurrent"), 5, minimum=1
         )
 
         email = section("notifications").get("email")

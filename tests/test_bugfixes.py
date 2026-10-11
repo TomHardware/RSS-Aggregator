@@ -1,3 +1,11 @@
+"""RSS-Aggregator 缺陷回归测试。
+
+设计目标：同一份测试在「修复前」失败、在「修复后」通过，作为缺陷的客观证据。
+不依赖 pytest：直接 `python tests/test_bugfixes.py` 即可运行；有 pytest 时也能被收集。
+
+约定的工作方式：每个用例在临时目录里建一份独立配置 + 独立 SQLite 库，
+并重置 ConfigLoader 单例，避免用例之间互相污染。
+"""
 import os
 import sys
 import shutil
@@ -96,6 +104,15 @@ class Env:
         让同一份用例在修复前后都能跑到真正的断言点。
         """
         from app import create_app, db
+
+        # 任务登记表是进程级的：用例之间要清空，否则上一个用例留下的
+        # 「运行中」任务会占用并发额度，影响后续用例。
+        try:
+            from app import tasks as task_registry
+
+            task_registry.reset()
+        except ImportError:
+            pass
 
         application = create_app(self.cfg)
         with application.app_context():
@@ -243,7 +260,7 @@ def test_pages_render():
 
 @test
 def test_add_source_flash_does_not_crash():
-    """add_source 会调用 flash()，没有 SECRET_KEY 时必然返回 500。"""
+    """add_source 会调用 flash()，没有 SECRET_KEY 时必然 500。"""
     env = make_env()
     try:
         app = env.app()
@@ -829,7 +846,7 @@ def test_default_config_survives_absolute_path():
 
 
 # --------------------------------------------------------------------------- #
-# runner（运行）
+# runner
 # --------------------------------------------------------------------------- #
 def main():
     passed, failed = [], []

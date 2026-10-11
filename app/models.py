@@ -1,8 +1,15 @@
+"""ORM 模型。
+
+要点：
+1. `Article.link` 唯一索引：只靠「先查再插」去重，手动刷新（请求线程）与
+   定时任务（调度线程）并发时会重复入库。
+2. 排序/过滤索引（published、source_id、read+published），避免翻页与未读筛选全表扫描。
+3. 时间统一用 naive UTC，避免 aware/naive 混用，也避开 3.12 起废弃的 utcnow()。
+4. v2.0.1 新增 `Source.enabled`：可以暂停某个源而不删除它（暂停后不再调度）。
+"""
 from datetime import datetime, timezone
 
 from app import db
-
-MAX_SOURCE_URL_CHARS = 500
 
 
 def utcnow():
@@ -13,7 +20,7 @@ def utcnow():
 class Source(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200))
-    url = db.Column(db.String(MAX_SOURCE_URL_CHARS), unique=True, nullable=False)
+    url = db.Column(db.String(500), unique=True, nullable=False)
     category = db.Column(db.String(100), default="General")
     interval = db.Column(db.Integer, default=30)  # minutes
     enabled = db.Column(db.Boolean, default=True, nullable=False)

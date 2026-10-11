@@ -10,7 +10,7 @@
         <h1>{{ app_name }}</h1>
         <p>
             <a href="{{ lang_url('en') }}">English</a> | <a href="{{ lang_url('zh') }}">中文</a>
-            &nbsp;·&nbsp; <strong>{{ _('unread_total', count=total_unread) }}</strong>
+            &nbsp;·&nbsp; <strong id="unread-total">{{ _('unread_total', count=total_unread) }}</strong>
             {% if auth_enabled %}
                 &nbsp;·&nbsp; <small>{{ _('logged_in_as', name=current_user) }}</small>
                 <form action="{{ url_for('web.logout') }}" method="post" style="display:inline">
@@ -18,6 +18,8 @@
                 </form>
             {% endif %}
         </p>
+        <!-- 前端轮询：显示后台抓取进展，抓完自动刷新页面 -->
+        <p id="task-status" class="task-status" data-endpoint="{{ url_for('web.api_status') }}"></p>
     </header>
 
     {% with messages = get_flashed_messages() %}
@@ -142,5 +144,78 @@
     <footer>
         <small>{{ app_name }} {{ app_version }}</small>
     </footer>
+
+    <script>
+    // 任务状态轮询：默认 5 秒一次；发现「刚跑完的抓取」就刷新页面，
+    // 这样添加源之后新文章会自动出现，不用手动刷新。
+    (function () {
+        const box = document.getElementById('task-status');
+        if (!box || !window.fetch) return;
+        const endpoint = box.dataset.endpoint;
+        const L = {{ {
+            "running": _("task_running"),
+            "running_unknown": _("task_running_unknown"),
+            "done": _("task_done"),
+            "failed": _("task_failed"),
+        } | tojson }};
+        const INTERVAL = 5000;
+        let known = new Set();
+        let primed = false;
+
+        function label(task) {
+            const name = task.source_name || ('#' + (task.source_id ?? '?'));
+            if (task.state === 'running') {
+                return name ? L.running.replace('{name}', name) : L.running_unknown;
+            }
+            if (task.state === 'success') {
+                return L.done.replace('{count}', task.new_articles).replace('{name}', name);
+            }
+            return L.failed.replace('{name}', name);
+        }
+
+        async function poll() {
+            try {
+                const resp = await fetch(endpoint, {
+                    headers: {'Accept': 'application/json'},
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                });
+                if (resp.status === 401) { window.location.reload(); return; }  // 会话过期
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const running = data.running || [];
+                const recent = data.recent || [];
+                const nowRunning = new Set(running.map(t => t.id));
+
+                // 曾经在跑、现在不在跑了 → 抓取刚结束，刷新页面让新文章出现
+                if (primed && Array.from(known).some(id => !nowRunning.has(id))) {
+                    window.location.reload();
+                    return;
+                }
+                known = nowRunning;
+                primed = true;
+
+                const counter = document.getElementById('unread-total');
+                if (counter && typeof data.unread_total === 'number') {
+                    counter.textContent = counter.textContent.replace(/[\d,]+/, data.unread_total);
+                }
+
+                if (running.length) {
+                    box.textContent = running.map(label).join(' · ');
+                } else if (recent.length) {
+                    box.textContent = label(recent[0]);
+                } else {
+                    box.textContent = '';
+                }
+            } catch (err) {
+                /* 网络抖动忽略，下一轮再试 */
+            }
+        }
+
+        poll();
+        setInterval(poll, INTERVAL);
+    })();
+    </script>
 </body>
 </html>

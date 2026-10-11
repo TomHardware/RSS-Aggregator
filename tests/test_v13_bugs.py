@@ -1,3 +1,8 @@
+"""v1.3 第二轮审查：针对新发现缺陷的验证用例。
+
+与 test_bugfixes.py 一样，同一份用例在修复前失败、修复后通过。
+用法：python tests/test_v13_bugs.py
+"""
 import os
 import socket
 import sys

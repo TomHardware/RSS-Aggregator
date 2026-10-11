@@ -1,3 +1,17 @@
+"""RSS 抓取。
+
+修复要点：
+1. 失败分支必须 `db.session.rollback()`。原来出错直接 return，已 add 但未提交的
+   文章会留在 session 里，被之后任意一次 commit 悄悄写进数据库。
+2. 去重查询改为一次批量 SELECT。原来每个条目查一次，50 条就是 50 次查询。
+3. 全文抽取不再是「每个没有 content 的条目都同步抓一次网页」（最多 50 × 10s），
+   改为受 fulltext.enabled / max_per_fetch / timeout 控制，避免请求线程被拖死。
+4. 抓取前做 URL 安全校验（SSRF），默认拒绝内网/回环/链路本地地址；
+   并且**逐跳校验重定向**、限制响应体大小（见 app/urlsafety.safe_get）——
+   只校验首个地址时，一个公网 feed 用 302 就能把服务端引到内网。
+5. 并发写入撞上唯一约束时逐条降级重试，而不是让整批抓取失败。
+6. 通知邮件在事务提交之后发送，只列出真正入库的文章，且失败不影响抓取结果。
+"""
 import logging
 import time
 from datetime import datetime
@@ -157,8 +171,20 @@ def _notify(source, articles):
         logger.error("发送通知邮件失败: %s", exc)
 
 
-def fetch_source(source_id, notify=False):
-    """抓取一个源。必须在应用上下文中调用（调度器已自动推入上下文）。"""
+def _finish_task(task_id, ok, count=0, message=""):
+    """把结果写回任务登记表（供前端轮询）；没有 task_id 时什么都不做。"""
+    if not task_id:
+        return
+    from app.tasks import finish
+
+    finish(task_id, ok, count, message)
+
+
+def fetch_source(source_id, notify=False, task_id=None):
+    """抓取一个源。必须在应用上下文中调用（调度器已自动推入上下文）。
+
+    传入 `task_id` 时会把结果登记到 app/tasks.py，供 `/api/status` 与前端轮询展示。
+    """
     if not has_app_context():
         raise RuntimeError(
             "fetch_source 需要 Flask 应用上下文；后台任务请通过 app.scheduler 注册"
@@ -166,11 +192,13 @@ def fetch_source(source_id, notify=False):
 
     source = db.session.get(Source, source_id)
     if source is None:
+        _finish_task(task_id, False, 0, "Source not found")
         return False, "Source not found"
 
     allow_private = bool(_config("SECURITY_ALLOW_PRIVATE_NETWORKS", False))
     if not is_safe_url(source.url, allow_private=allow_private):
         logger.warning("抓取被安全策略拒绝（疑似内网地址）: %s", source.url)
+        _finish_task(task_id, False, 0, "URL blocked by security policy")
         return False, "URL blocked by security policy"
 
     retries = max(1, int(_config("FETCH_RETRIES", 3)))
@@ -228,6 +256,8 @@ def fetch_source(source_id, notify=False):
             "从 %s 抓取到 %d 条新文章（%d 条因全文抽取配额未抓正文，保留策略清理 %d 条）",
             source.name, len(saved), skipped, removed,
         )
+        _finish_task(task_id, True, len(saved), f"Fetched {len(saved)} new entries")
         return True, f"Fetched {len(saved)} new entries"
 
+    _finish_task(task_id, False, 0, last_error)
     return False, last_error

@@ -1,3 +1,7 @@
+"""v2.0.1：新增功能与第四轮审查缺陷的验证用例。
+
+用法：python tests/test_v2_bugs.py
+"""
 import os
 import sys
 import threading
@@ -346,7 +350,7 @@ def test_initial_fetch_is_async():
         started = threading.Event()
         finished = threading.Event()
 
-        def slow_fetch(source_id, notify=False):
+        def slow_fetch(source_id, notify=False, task_id=None):
             started.set()
             time.sleep(1.5)
             finished.set()

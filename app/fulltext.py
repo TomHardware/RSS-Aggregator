@@ -1,3 +1,13 @@
+"""网页正文抽取。
+
+修复要点：
+1. 抽取目标来自 feed 里的文章链接，必须做 SSRF 校验（与抓取同一套策略），
+   而且重定向同样要逐跳校验（走 urlsafety.safe_get）。
+2. 超时、开关与响应体上限可配置（fulltext.timeout / max_bytes），不再硬编码 10s。
+3. lxml 缺失时回退到标准库解析器，而不是让整条链路报错。
+4. 交给 BeautifulSoup 的是原始字节，由它按 meta/BOM 判断编码，
+   避免非 UTF-8 页面（GBK 等）正文变成乱码。
+"""
 import logging
 
 from bs4 import BeautifulSoup, FeatureNotFound

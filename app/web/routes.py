@@ -1,3 +1,16 @@
+"""Web 路由。
+
+修复要点：
+1. 蓝图必须声明 template_folder='templates'。模板在 app/web/templates/，
+   而 Flask(__name__) 只会去 app/templates/ 找，原来每个页面都
+   TemplateNotFound → 整站 500。
+2. 分页链接保留当前查询条件（原来用 request.view_args，把 q / lang / source_id /
+   unread 全丢了，搜索翻到第二页就变成全量列表）。
+3. 会改状态的操作用 POST（原来是 GET：浏览器预取、<img> 标签、爬虫都能删库）。
+4. interval 容错解析并强制 ≥ 5 分钟（原来非数字直接 500，0/负数会注册非法任务）。
+5. 重复 URL 友好提示而不是 IntegrityError 500；新增/导入的源立即注册调度任务。
+6. 补上「标记已读」入口，让 unread 过滤形成闭环（原来 read 永远是 False）。
+"""
 import logging
 import re
 import threading
@@ -6,6 +19,7 @@ from flask import (
     Blueprint,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -14,7 +28,7 @@ from flask import (
 from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
 
-from app import db
+from app import db, tasks
 from app.auth import (
     auth_enabled,
     client_key,
@@ -26,7 +40,7 @@ from app.auth import (
 )
 from app.fetcher import fetch_source
 from app.i18n import translate
-from app.models import MAX_SOURCE_URL_CHARS, Article, Source
+from app.models import Article, Source
 from app.opml import export_opml, import_opml
 from app.search import search_articles
 from app.security import check_csrf_origin
@@ -39,7 +53,7 @@ DEFAULT_INTERVAL_MINUTES = 30
 PER_PAGE = 50
 MAX_OPML_BYTES = 5 * 1024 * 1024
 FILTER_KEYS = ("q", "source_id", "unread", "lang")
-MAX_URL_CHARS = MAX_SOURCE_URL_CHARS
+MAX_URL_CHARS = 500      # 与 Source.url 的列宽一致
 MAX_NAME_CHARS = 200     # 与 Source.name 的列宽一致
 MAX_CATEGORY_CHARS = 100  # 与 Source.category 的列宽一致
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
@@ -100,8 +114,19 @@ def _context(**extra):
     return context
 
 
-def _unread_counts():
-    """每个源的未读数与总未读数（read 为 NULL 也算未读）。"""
+_UNREAD_CACHE = {"at": 0.0, "value": ({}, 0)}
+
+
+def _unread_counts(max_age=3.0):
+    """每个源的未读数与总未读数（read 为 NULL 也算未读）。
+
+    前端每几秒轮询一次，这里做一个 3 秒的短缓存，避免把统计查询压到每次轮询上。
+    """
+    import time as _time
+
+    now = _time.time()
+    if now - _UNREAD_CACHE["at"] < max_age:
+        return _UNREAD_CACHE["value"]
     try:
         rows = (
             db.session.query(Article.source_id, func.count(Article.id))
@@ -113,7 +138,9 @@ def _unread_counts():
         logging.getLogger(__name__).warning("统计未读数失败: %s", exc)
         return {}, 0
     counts = {source_id: count for source_id, count in rows}
-    return counts, sum(counts.values())
+    value = (counts, sum(counts.values()))
+    _UNREAD_CACHE.update({"at": now, "value": value})
+    return value
 
 
 def _parse_interval(raw, default=DEFAULT_INTERVAL_MINUTES):
@@ -302,6 +329,69 @@ def healthz():
 
 
 # --------------------------------------------------------------------------- #
+# 任务状态接口（前端轮询用）
+# --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# 网页控制台（本地 GUI 的网页版）
+# --------------------------------------------------------------------------- #
+@web_bp.route("/console")
+def console():
+    """集中管理页：订阅源一览 + 批量操作 + 任务进展。"""
+    counts, total_unread = _unread_counts()
+    return render_template(
+        "console.html",
+        **_context(
+            sources=Source.query.order_by(Source.id).all(),
+            unread_counts=counts,
+            total_unread=total_unread,
+            article_count=Article.query.count(),
+        )
+    )
+
+
+@web_bp.route("/refresh_all", methods=["POST"])
+def refresh_all():
+    """一键抓取全部启用中的源（能后台就后台，并发满了则同步）。"""
+    from app.services import fetch_all
+
+    started, done = fetch_all(notify=True)
+    flash(_t("gui_fetch_all_started"))
+    logger.info("全部抓取：后台 %d 个，同步完成 %d 个", started, done)
+    return redirect(url_for("web.console"))
+
+
+@web_bp.route("/api/status")
+def api_status():
+    """后台任务进展 + 未读数 + 版本号，供页面轮询。
+
+    只读、无副作用；任务表在内存里，多 worker 部署时各自独立。
+    """
+    from app.models import utcnow
+
+    data = tasks.snapshot()
+    _, total_unread = _unread_counts()
+    return jsonify(
+        {
+            "version": current_app.config.get("APP_VERSION", ""),
+            "server_time": utcnow().isoformat(sep=" ", timespec="seconds"),
+            "running": data["running"],
+            "recent": data["recent"],
+            "unread_total": total_unread,
+            "sources": Source.query.count(),
+        }
+    )
+
+
+@web_bp.route("/api/tasks/<task_id>")
+def api_task(task_id):
+    """查询单个任务的状态。"""
+    task = tasks.get(task_id)
+    if task is None:
+        return jsonify({"error": "task not found"}), 404
+    return jsonify(task)
+
+
+# --------------------------------------------------------------------------- #
 # 源管理
 # --------------------------------------------------------------------------- #
 @web_bp.route("/add_source", methods=["POST"])
@@ -354,27 +444,45 @@ def add_source():
 
     if current_app.config.get("FETCH_INITIAL_ASYNC", True):
         # 首次抓取放后台：全文抽取 + 网络重试最坏能拖住请求几十秒
-        start_background_fetch(source.id)
-        flash(_t("msg_source_added_fetching"))
-        logger.info("源 %s 已添加，首次抓取转入后台", source.id)
-    else:
-        ok, message = fetch_source(source.id, notify=True)
-        flash(_t("msg_source_added") if ok else _t("msg_source_added_fetch_failed"))
-        if not ok:
-            logger.warning("源 %s 首次抓取失败: %s", source.id, message)
+        if start_background_fetch(source.id, source.name) is not None:
+            flash(_t("msg_source_added_fetching"))
+            logger.info("源 %s 已添加，首次抓取转入后台", source.id)
+            return redirect(url_for("web.index"))
+        # 后台任务已满：退回同步抓取，功能仍然可用
+
+    ok, message = fetch_source(source.id, notify=True)
+    flash(_t("msg_source_added") if ok else _t("msg_source_added_fetch_failed"))
+    if not ok:
+        logger.warning("源 %s 首次抓取失败: %s", source.id, message)
     return redirect(url_for("web.index"))
 
 
-def start_background_fetch(source_id):
-    """在后台线程里完成首次抓取（需要自己推应用上下文）。"""
+def start_background_fetch(source_id, source_name=None):
+    """在后台线程里完成首次抓取（需要自己推应用上下文）。
+
+    并发任务已达上限时返回 None，由调用方回落到同步抓取——
+    否则反复点「添加源」就能无限起线程。
+    """
+    try:
+        task_id = tasks.start(
+            "initial_fetch",
+            source_id=source_id,
+            source_name=source_name,
+            max_concurrent=current_app.config.get("TASKS_MAX_CONCURRENT"),
+        )
+    except tasks.TooManyTasks as exc:
+        logger.warning("后台任务过多，改为同步抓取 source=%s: %s", source_id, exc)
+        return None
+
     app = current_app._get_current_object()
 
     def worker():
         with app.app_context():
             try:
-                fetch_source(source_id, notify=True)
+                fetch_source(source_id, notify=True, task_id=task_id)
             except Exception as exc:  # noqa: BLE001 - 后台任务不能把异常抛给请求
                 logger.error("后台首次抓取失败 source=%s: %s", source_id, exc)
+                tasks.finish(task_id, False, 0, str(exc))
 
     thread = threading.Thread(target=worker, name=f"initial-fetch-{source_id}", daemon=True)
     thread.start()

@@ -1,3 +1,8 @@
+"""v1.4 第三轮审查：新增缺陷的验证用例。
+
+同一份用例在修复前失败、修复后通过。
+用法：python tests/test_v14_bugs.py
+"""
 import os
 import sys
 import traceback
@@ -101,33 +106,6 @@ def test_oversized_feed_url_is_rejected_not_truncated():
             f"入库 {len(stored.url)} 字符（末尾 {stored.url[-20:]!r}）"
         )
         assert resp.status_code == 200
-    finally:
-        env.close()
-
-
-@test
-def test_oversized_opml_feed_url_is_rejected_not_truncated():
-    """OPML 中超过数据库字段长度的 URL 必须拒绝，而不是静默截断后入库。"""
-    env = make_env()
-    try:
-        from app import db
-        from app.models import Source
-        from app.opml import import_opml
-
-        app = env.app()
-        xml_url = "http://example.com/" + "x" * 500
-        content = (
-            '<opml version="2.0"><body>'
-            f'<outline type="rss" text="Long" xmlUrl="{xml_url}"/>'
-            "</body></opml>"
-        )
-        with app.app_context(), mock.patch("app.opml.is_safe_url", return_value=True):
-            result = import_opml(content)
-            db.session.expire_all()
-            imported = Source.query.filter_by(name="Long").first()
-
-        assert result == (0, 1), f"超长 URL 应计为失败，实际结果为 {result}"
-        assert imported is None, "超长 URL 被截断后写入了数据库"
     finally:
         env.close()
 

@@ -1,8 +1,21 @@
+"""登录鉴权（单用户）。
+
+设计取舍：
+* **单用户**。这是个自托管的个人 / 小团队阅读器，引入用户表、注册流程、权限模型
+  与其定位不符；一个账号 + 会话就足以把「任何人都能增删订阅」这个最大风险堵上。
+* **口令只存哈希**。支持三种来源，优先级从高到低：
+    1. 环境变量 `RSS_AGGREGATOR_PASSWORD`（明文，启动时哈希，适合容器 / CI）；
+    2. 配置 `auth.password_hash`（用 `python -m app.auth <password>` 生成）；
+    3. 配置 `auth.password`（明文，仅为方便，启动时会提示改用哈希）。
+* **未配置口令时不锁死**：鉴权自动关闭并打一条醒目的警告，
+  避免升级后把现有部署挡在门外；一旦配置了口令就强制登录。
+* **失败次数限制**：同一来源连续失败达到阈值后短暂锁定，抵挡在线爆破。
+"""
 import logging
 import secrets
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 
 from flask import current_app, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -15,6 +28,10 @@ PUBLIC_ENDPOINTS = {"web.login", "web.healthz", "static"}
 MAX_FAILURES = 5
 LOCKOUT_SECONDS = 300
 FAILURE_WINDOW_SECONDS = 900
+MAX_TRACKED_CLIENTS = 10000  # 失败记录表的键上限，防止长期运行内存膨胀
+
+# 明文口令 → 派生哈希的缓存：配置里写明文时，避免每次登录都重新做一次慢哈希
+_hash_cache = {"plain": None, "hash": None}
 
 
 class LoginThrottle:
@@ -23,21 +40,39 @@ class LoginThrottle:
     def __init__(self, max_failures=MAX_FAILURES, lockout_seconds=LOCKOUT_SECONDS):
         self.max_failures = max_failures
         self.lockout_seconds = lockout_seconds
-        self._failures = defaultdict(deque)
+        self._failures = {}
         self._lock = threading.Lock()
+        self._since_prune = 0
 
     def _trim(self, key, now):
-        window = self._failures[key]
+        """返回该来源仍需保留的失败窗口（必要时新建并写回字典）。
+
+        注意不能在这里删除空窗口：`setdefault` 新建的窗口一旦被删掉，
+        调用方 append 的就是一个游离的 deque，首次失败会**记不进去**，
+        限流会直接失效。
+        """
+        window = self._failures.setdefault(key, deque())
         while window and now - window[0] > FAILURE_WINDOW_SECONDS:
             window.popleft()
         return window
+
+    def _prune_all(self, now):
+        """清掉所有过期/空记录；键太多时再丢掉最旧的一批。"""
+        for key in list(self._failures):
+            window = self._failures[key]
+            while window and now - window[0] > FAILURE_WINDOW_SECONDS:
+                window.popleft()
+            if not window:
+                del self._failures[key]
+        while len(self._failures) > MAX_TRACKED_CLIENTS:
+            self._failures.pop(next(iter(self._failures)))
 
     def locked_for(self, key):
         """返回剩余锁定秒数；0 表示未锁定。"""
         now = time.time()
         with self._lock:
-            window = self._trim(key, now)
-            if len(window) < self.max_failures:
+            window = self._failures.get(key)
+            if not window or len(window) < self.max_failures:
                 return 0
             remaining = self.lockout_seconds - (now - window[-1])
         return max(0, int(remaining))
@@ -45,11 +80,21 @@ class LoginThrottle:
     def record_failure(self, key):
         now = time.time()
         with self._lock:
+            self._since_prune += 1
+            if self._since_prune >= 50:
+                self._since_prune = 0
+                self._prune_all(now)  # 定期清理，避免键无限增长
             self._trim(key, now).append(now)
+            if len(self._failures) > MAX_TRACKED_CLIENTS:
+                self._prune_all(now)
 
     def reset(self, key):
         with self._lock:
             self._failures.pop(key, None)
+
+    def tracked_clients(self):
+        with self._lock:
+            return len(self._failures)
 
 
 throttle = LoginThrottle()
@@ -61,17 +106,24 @@ def hash_password(password):
 
 
 def _configured_hash():
-    """返回配置里的口令哈希；没有配置口令时返回 None。"""
+    """返回配置里的口令哈希；没有配置口令时返回 None。
+
+    配置写的是明文时，派生一次并缓存：`generate_password_hash` 故意很慢，
+    原实现每次登录尝试都要重新派生一遍。
+    """
     direct = current_app.config.get("AUTH_PASSWORD_HASH")
     if direct:
         return direct
     plain = current_app.config.get("AUTH_PASSWORD")
     if plain:
-        logger.warning(
-            "auth.password 是明文口令，建议改用 auth.password_hash"
-            "（生成方式：python -m app.auth <password>）"
-        )
-        return generate_password_hash(plain)
+        if _hash_cache["plain"] != plain or _hash_cache["hash"] is None:
+            logger.warning(
+                "auth.password 是明文口令，建议改用 auth.password_hash"
+                "（生成方式：python -m app.auth <password>）"
+            )
+            _hash_cache["plain"] = plain
+            _hash_cache["hash"] = generate_password_hash(plain)
+        return _hash_cache["hash"]
     return None
 
 
@@ -123,7 +175,8 @@ def require_login():
         return None
     if current_user():
         return None
-    if request.method == "GET" and request.accept_mimetypes.best == "application/json":
+    # 接口返回 JSON 401，而不是把 fetch() 重定向到登录页（那会拿到一页 HTML）
+    if request.path.startswith("/api/"):
         return {"error": "authentication required"}, 401
     return redirect(url_for("web.login", next=request.full_path if request.query_string else request.path))
 

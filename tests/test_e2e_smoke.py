@@ -1,4 +1,13 @@
+"""端到端冒烟测试。
+
+与单元级回归测试互补：这里真的启动 `python main.py`（走 main.py 的引导流程），
+用真实 HTTP 请求驱动，并用一个本地 HTTP 服务提供真实 RSS 源，
+验证「添加源 → 抓取入库 → 页面渲染 → 搜索 → OPML 导出/导入 → 健康检查」整条链路。
+
+用法：python tests/test_e2e_smoke.py
+"""
 import os
+import json
 import subprocess
 import sys
 import tempfile
@@ -162,8 +171,7 @@ def main():
     app_server = subprocess.Popen(
         [PYTHON, os.path.join(REPO, "main.py")], cwd=workdir,
         env={**env, "PYTHONPATH": REPO},
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-        errors="replace", bufsize=1,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
     collector = OutputCollector(app_server.stdout)
     collector.start()
@@ -203,6 +211,35 @@ def main():
                 break
             time.sleep(0.5)
         check("后台首次抓取结果最终入库并渲染", fetched, "25 秒内没有抓到文章")
+
+        # 任务状态接口：前端轮询依赖它，必须在真实服务器上可用
+        status, body = http("GET", "/api/status")
+        try:
+            payload = json.loads(body)
+        except ValueError:
+            payload = {}
+        check("GET /api/status 返回 JSON", status == 200 and isinstance(payload, dict), f"status={status}")
+        check("接口带版本号", bool(payload.get("version")), payload.get("version"))
+        recent = payload.get("recent") or []
+        done = [t for t in recent if t.get("state") == "success"]
+        check(
+            "接口能看到已完成的抓取任务",
+            bool(done),
+            f"recent={recent}",
+        )
+        if done:
+            check(
+                "任务记录了新增文章数",
+                done[0].get("new_articles") == 2,
+                f"new_articles={done[0].get('new_articles')}",
+            )
+        check(
+            "接口带未读总数",
+            isinstance(payload.get("unread_total"), int),
+            payload.get("unread_total"),
+        )
+        status, body = http("GET", "/api/tasks/does-not-exist")
+        check("未知任务返回 404", status == 404, f"status={status}")
 
         status, body = http("GET", "/search?q=Article+Two")
         check("搜索命中", status == 200 and "Smoke Article Two" in body, f"status={status}")

@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**Current version: 2.0.3** &nbsp;·&nbsp; `/healthz` reports it too.
+**Current version: 2.0.4** &nbsp;·&nbsp; `/healthz` reports it too.
 
 A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML import/export, full-text extraction, search, email notifications, and a bilingual web interface. Ideal for personal or team use in information aggregation, content monitoring, and reading management.
 
@@ -26,6 +26,9 @@ A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML im
 - **Full-Text Extraction**: For sources that provide only summaries, attempts to extract the full article text using BeautifulSoup.
 - **Keyword Filtering & Full-Text Search**: Search across title, summary, and content, with optional filtering by source and unread status.
 - **Custom Update Frequency**: Each source can have its own fetch interval.
+- **Task visibility**: background fetches are tracked and exposed through `GET /api/status`; the web UI polls it every five seconds, shows what is being fetched and refreshes itself when a fetch finishes.
+- **Local desktop GUI**: `python desktop_gui.py` opens a native window (tkinter, bundled with Python) for managing feeds and reading articles; it starts the same web service in the background, so the browser works at the same time.
+- **Web console**: `/console` gives a compact dashboard with bulk actions (`Fetch all`, pause/resume, edit, delete) for when a browser is more convenient.
 - **Email Notifications**: Configure SMTP to receive email alerts when new articles are fetched.
 - **Docker Deployment**: Dockerfile and docker-compose.yaml provided for easy deployment.
 
@@ -62,6 +65,9 @@ rss_aggregator/
 │   ├── security.py          # Cross-site request origin check
 │   ├── auth.py              # Single-user login, session and lockout
 │   ├── retention.py         # Article retention (per-feed count / age)
+│   ├── tasks.py             # In-memory background task registry for /api/status
+│   ├── services.py          # Shared operations used by the web UI, console and desktop GUI
+│   ├── gui.py               # Desktop GUI (tkinter, no extra dependency)
 │   ├── i18n.py              # English/Chinese translations
 │   ├── opml.py              # OPML import/export
 │   ├── fulltext.py          # Full-text extraction
@@ -72,15 +78,18 @@ rss_aggregator/
 │       ├── routes.py        # Routes and views
 │       └── templates/
 │           ├── index.html   # Main page template
-│           └── login.html   # Sign-in page
+│           ├── login.html   # Sign-in page
+│           └── console.html # Web console (dashboard + bulk actions)
 ├── tests/
 │   ├── test_bugfixes.py       # Regression tests (30 cases)
 │   ├── test_v13_bugs.py       # v1.3 audit tests (8 cases)
 │   ├── test_v14_bugs.py       # v1.4 audit tests + repository layout checks (7 cases)
 │   ├── test_v2_bugs.py        # v2.0.1 features and fixes (16 cases)
+│   ├── test_v202_bugs.py      # v2.0.2 task API, polling and fixes (14 cases)
 │   ├── test_e2e_smoke.py      # End-to-end smoke test (starts a real server)
 │   └── test_debug_reloader.py # Verifies the scheduler starts only once under --debug
-├── main.py                  # Entry point
+├── main.py                  # Web entry point
+├── desktop_gui.py           # Entry point for the local desktop GUI
 ├── config.yaml              # Configuration file
 ├── requirements.txt         # Python dependencies
 ├── Dockerfile               # Must stay at the build context root (compose uses `build: .`)
@@ -167,6 +176,9 @@ auth:
 retention:
   max_articles_per_source: 0   # Keep at most N articles per feed (0 = unlimited)
   max_age_days: 0              # Keep articles newer than N days (0 = unlimited)
+
+tasks:
+  max_concurrent: 5            # Max background fetches; when full, adds fall back to sync
 
 fetch:
   retries: 3                   # Retries for network errors

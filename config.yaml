@@ -31,13 +31,18 @@ retention:
   max_articles_per_source: 0   # 每个源最多保留多少条（0 = 不限）
   max_age_days: 0              # 只保留最近多少天（0 = 不限）
 
+tasks:
+  # 同时运行的后台抓取任务上限。达到上限时「添加源」会退回同步抓取，
+  # 定时抓取会跳过本轮，避免无限起线程。
+  max_concurrent: 5
+
 fetch:
   retries: 3               # 网络类错误的重试次数
   timeout: 15              # 单次请求超时（秒）
   max_entries: 50          # 每次抓取最多「新增」多少条（按新增数封顶，历史条目会逐次补齐）
   max_bytes: 8388608       # 单个 feed 响应体上限（字节，默认 8 MB），超出即截断
   initial_async: true      # 添加源后立即返回，首次抓取放到后台线程（避免请求被拖住）
-  user_agent: "RSSAggregator/2.0.2 (+https://github.com/forestwolf-ai/RSS-Aggregator)"
+  user_agent: "RSSAggregator/2.0.4 (+https://github.com/forestwolf-ai/RSS-Aggregator)"
 
 fulltext:
   enabled: true

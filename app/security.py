@@ -1,3 +1,10 @@
+"""轻量安全校验。
+
+只做「跨站来源检查」：浏览器发起的跨站 POST 一定带 Origin（或 Referer），
+与本站不一致就拒绝。这是 CSRF 的最低成本防线。
+
+它不能替代登录鉴权——本项目没有认证机制，请勿直接暴露到公网。
+"""
 import logging
 from urllib.parse import urlsplit
 

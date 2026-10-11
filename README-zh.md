@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**当前版本：2.0.3** &nbsp;·&nbsp; `/healthz` 也会返回版本号。
+**当前版本：2.0.4** &nbsp;·&nbsp; `/healthz` 也会返回版本号。
 
 一个功能丰富、可自托管的 RSS 订阅聚合器。支持定时抓取、OPML 导入导出、全文提取、关键词搜索过滤、邮件通知，并提供中英文双语 Web 界面。适合个人或团队用于信息聚合、内容监控和阅读管理。
 
@@ -26,6 +26,9 @@
 - **全文提取**：对只提供摘要的源，尝试自动抓取网页正文（基于 BeautifulSoup）。
 - **关键词过滤与全文搜索**：支持按标题、摘要、正文搜索，可结合源分类和未读状态过滤。
 - **自定义更新频率**：每个源可单独配置抓取间隔，灵活控制资源占用。
+- **任务可见**：后台抓取会被登记，并通过 `GET /api/status` 暴露；网页每 5 秒轮询一次，显示正在抓取什么、抓完自动刷新。
+- **本地桌面 GUI**：运行 `python desktop_gui.py` 打开原生窗口（tkinter，随 Python 自带）管理订阅源与阅读文章；窗口内会同时启动同一套 Web 服务，浏览器也能同时用。
+- **网页控制台**：`/console` 提供紧凑的仪表盘与批量操作（全部抓取、暂停/恢复、编辑、删除），适合用浏览器时使用。
 - **邮件推送通知**：配置 SMTP 后，抓取到新文章可自动发送邮件提醒。
 - **Docker 部署**：提供 Dockerfile 和 docker-compose.yaml，方便快速部署。
 
@@ -62,6 +65,9 @@ rss_aggregator/
 │   ├── security.py          # 跨站请求来源校验
 │   ├── auth.py              # 单用户登录、会话与失败锁定
 │   ├── retention.py         # 文章保留策略（每源条数 / 天数）
+│   ├── tasks.py             # 后台任务登记表（供 /api/status 使用）
+│   ├── services.py          # 网页、控制台与桌面 GUI 共用的业务操作
+│   ├── gui.py               # 桌面 GUI（tkinter，无需额外依赖）
 │   ├── i18n.py              # 中英文翻译
 │   ├── opml.py              # OPML 导入导出
 │   ├── fulltext.py          # 全文提取
@@ -72,15 +78,18 @@ rss_aggregator/
 │       ├── routes.py        # 路由与视图
 │       └── templates/
 │           ├── index.html   # 主页面模板
-│           └── login.html   # 登录页模板
+│           ├── login.html   # 登录页模板
+│           └── console.html # 网页控制台（仪表盘 + 批量操作）
 ├── tests/
 │   ├── test_bugfixes.py       # 回归测试（30 例）
 │   ├── test_v13_bugs.py       # v1.3 审查用例（8 例）
 │   ├── test_v14_bugs.py       # v1.4 审查用例 + 仓库布局检查（7 例）
 │   ├── test_v2_bugs.py        # v2.0.1 功能与修复用例（16 例）
+│   ├── test_v202_bugs.py      # v2.0.2 任务接口、轮询与修复用例（14 例）
 │   ├── test_e2e_smoke.py      # 端到端冒烟测试（会真的启动服务）
 │   └── test_debug_reloader.py # 验证 --debug 下调度器只启动一次
-├── main.py                  # 程序入口
+├── main.py                  # 网页版入口
+├── desktop_gui.py           # 本地桌面 GUI 入口
 ├── config.yaml              # 配置文件
 ├── requirements.txt         # Python 依赖
 ├── Dockerfile               # 必须留在构建上下文根目录（compose 用 `build: .`）
@@ -167,6 +176,9 @@ auth:
 retention:
   max_articles_per_source: 0   # 每个源最多保留多少条（0 = 不限）
   max_age_days: 0              # 只保留最近多少天（0 = 不限）
+
+tasks:
+  max_concurrent: 5            # 后台抓取并发上限；满了以后「添加源」退回同步抓取
 
 fetch:
   retries: 3                   # 网络类错误的重试次数

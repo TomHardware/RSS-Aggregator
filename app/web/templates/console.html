@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ _('console_title') }} - {{ app_name }}</title>
+</head>
+<body>
+    <header>
+        <h1>{{ app_name }} · {{ _('console_title') }}</h1>
+        <p>
+            <a href="{{ lang_url('en') }}">English</a> | <a href="{{ lang_url('zh') }}">中文</a>
+            &nbsp;·&nbsp; <a href="{{ url_for('web.index') }}">{{ _('console_home') }}</a>
+            {% if auth_enabled %}
+                &nbsp;·&nbsp; <small>{{ _('logged_in_as', name=current_user) }}</small>
+                <form action="{{ url_for('web.logout') }}" method="post" style="display:inline">
+                    <button type="submit">{{ _('logout') }}</button>
+                </form>
+            {% endif %}
+        </p>
+        <!-- 与首页共用同一个任务状态接口 -->
+        <p id="task-status" class="task-status" data-endpoint="{{ url_for('web.api_status') }}"></p>
+    </header>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <hr>
+
+    <section>
+        <p>
+            <strong>{{ _('unread_total', count=total_unread) }}</strong>
+            &nbsp;·&nbsp; {{ _('console_counts', sources=sources|length, articles=article_count) }}
+        </p>
+        <form action="{{ url_for('web.refresh_all') }}" method="post" style="display:inline">
+            <button type="submit">{{ _('gui_refresh_all') }}</button>
+        </form>
+        <form action="{{ url_for('web.import_opml_route') }}" method="post" enctype="multipart/form-data" style="display:inline">
+            <input type="file" name="opml_file" accept=".opml,.xml" required>
+            <button type="submit">{{ _('import_opml') }}</button>
+        </form>
+        <a href="{{ url_for('web.export_opml_route') }}">{{ _('export_opml') }}</a>
+    </section>
+
+    <h2>{{ _('sources') }}</h2>
+    {% if sources %}
+    <table border="1" cellpadding="4" cellspacing="0">
+        <thead>
+            <tr>
+                <th>{{ _('name') }}</th>
+                <th>{{ _('category') }}</th>
+                <th>{{ _('interval') }}</th>
+                <th>{{ _('gui_state') }}</th>
+                <th>{{ _('unread') }}</th>
+                <th>{{ _('last_fetched') }}</th>
+                <th>{{ _('console_actions') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for source in sources %}
+            <tr>
+                <td><a href="{{ url_for('web.search', source_id=source.id) }}">{{ source.name }}</a>
+                    <br><small>{{ source.url }}</small></td>
+                <td>{{ source.category }}</td>
+                <td>{{ source.interval }} min</td>
+                <td>{% if source.enabled %}{{ _('console_enabled') }}{% else %}<em>{{ _('paused') }}</em>{% endif %}</td>
+                <td>{{ unread_counts.get(source.id, 0) }}</td>
+                <td>{{ source.last_fetched or _('never_fetched') }}</td>
+                <td>
+                    <form action="{{ url_for('web.refresh_source', source_id=source.id) }}" method="post" style="display:inline">
+                        <button type="submit">{{ _('refresh') }}</button>
+                    </form>
+                    <form action="{{ url_for('web.toggle_source', source_id=source.id) }}" method="post" style="display:inline">
+                        <button type="submit">{{ _('resume') if not source.enabled else _('pause') }}</button>
+                    </form>
+                    <form action="{{ url_for('web.delete_source', source_id=source.id) }}" method="post" style="display:inline"
+                          onsubmit="return confirm('{{ _('delete_confirm') }}')">
+                        <button type="submit">{{ _('delete_source') }}</button>
+                    </form>
+                    <form action="{{ url_for('web.edit_source', source_id=source.id) }}" method="post">
+                        <input type="text" name="name" value="{{ source.name }}" size="12">
+                        <input type="text" name="category" value="{{ source.category }}" size="8">
+                        <input type="number" name="interval" value="{{ source.interval }}" min="5" size="4">
+                        <button type="submit">{{ _('save') }}</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>{{ _('console_no_feeds') }}</p>
+    {% endif %}
+
+    <hr>
+    <footer>
+        <small>{{ app_name }} {{ app_version }}</small>
+    </footer>
+
+    <script>
+    // 与首页同一套轮询逻辑：显示后台抓取进展，抓完自动刷新页面。
+    (function () {
+        const box = document.getElementById('task-status');
+        if (!box || !window.fetch) return;
+        const endpoint = box.dataset.endpoint;
+        const L = {{ {
+            "running": _("task_running"),
+            "running_unknown": _("task_running_unknown"),
+            "done": _("task_done"),
+            "failed": _("task_failed"),
+        } | tojson }};
+        let known = new Set();
+        let primed = false;
+
+        function label(task) {
+            const name = task.source_name || ('#' + (task.source_id ?? '?'));
+            if (task.state === 'running') {
+                return name ? L.running.replace('{name}', name) : L.running_unknown;
+            }
+            if (task.state === 'success') {
+                return L.done.replace('{count}', task.new_articles).replace('{name}', name);
+            }
+            return L.failed.replace('{name}', name);
+        }
+
+        async function poll() {
+            try {
+                const resp = await fetch(endpoint, {
+                    headers: {'Accept': 'application/json'},
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                });
+                if (resp.status === 401) { window.location.reload(); return; }
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const running = data.running || [];
+                const recent = data.recent || [];
+                const nowRunning = new Set(running.map(t => t.id));
+                if (primed && Array.from(known).some(id => !nowRunning.has(id))) {
+                    window.location.reload();
+                    return;
+                }
+                known = nowRunning;
+                primed = true;
+                if (running.length) {
+                    box.textContent = running.map(label).join(' · ');
+                } else if (recent.length) {
+                    box.textContent = label(recent[0]);
+                } else {
+                    box.textContent = '';
+                }
+            } catch (err) {
+                /* 网络抖动忽略 */
+            }
+        }
+
+        poll();
+        setInterval(poll, 5000);
+    })();
+    </script>
+</body>
+</html>
