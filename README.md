@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**Current version: 2.0.2** &nbsp;·&nbsp; `/healthz` reports it too.
+**Current version: 2.0.3** &nbsp;·&nbsp; `/healthz` reports it too.
 
 A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML import/export, full-text extraction, search, email notifications, and a bilingual web interface. Ideal for personal or team use in information aggregation, content monitoring, and reading management.
 
