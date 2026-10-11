@@ -1,4 +1,4 @@
-#utf-8
+# -*- coding: utf-8 -*-
 import logging
 
 from app import create_app
