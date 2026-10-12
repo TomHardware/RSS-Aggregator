@@ -25,8 +25,9 @@ def _like_pattern(text):
     return f"%{escaped}%"
 
 
-def search_articles(query, source_id=None, unread_only=False, page=1, per_page=50):
-    """按标题/摘要/正文搜索，支持来源与未读过滤、分页。"""
+def search_articles(query, source_id=None, unread_only=False, page=1, per_page=50,
+                    bookmarked_only=False):
+    """按标题/摘要/正文搜索，支持来源、未读与收藏过滤、分页。"""
     q = Article.query
 
     if query and query.strip():
@@ -46,6 +47,9 @@ def search_articles(query, source_id=None, unread_only=False, page=1, per_page=5
         # read 为 NULL（历史数据或外部写入）并不是「已读」，
         # 只判 is_(False) 会让这些文章从「只看未读」里凭空消失。
         q = q.filter(or_(Article.read.is_(False), Article.read.is_(None)))
+
+    if bookmarked_only:
+        q = q.filter(Article.bookmarked.is_(True))
 
     try:
         page = max(1, int(page or 1))

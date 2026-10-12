@@ -14,6 +14,7 @@
 """
 import argparse
 import logging
+import sys
 import threading
 import webbrowser
 
@@ -22,6 +23,14 @@ from tkinter import messagebox, simpledialog, ttk
 
 from app import create_app, db
 from app.i18n import translate
+from app.platform_utils import (
+    configure_console_encoding,
+    console_hint,
+    default_font_family,
+    enable_high_dpi,
+    platform_name,
+    tk_scaling,
+)
 from app.schema import ensure_schema
 from app.scheduler import init_scheduler
 from app.services import (
@@ -66,11 +75,22 @@ class DesktopApp:
         self.base_url = base_url
         self.lang = lang
         self.current_source_id = None
+        self.article_filter = "all"  # all | unread | bookmarked
 
         root.title(f"RSS Aggregator {__version__}")
-        root.geometry("1080x680")
-        root.minsize(900, 560)
+        self._apply_theme()
+        # 高分屏：Windows 需要显式 DPI 感知（在 main() 里设置），
+        # 这里再按真实 DPI 调整 Tk 的缩放系数，避免字体过小。
+        scaling = tk_scaling(root)
+        if scaling:
+            try:
+                root.tk.call("tk", "scaling", scaling)
+            except Exception:  # noqa: BLE001 - 个别 Tk 版本不支持
+                logger.debug("设置 tk scaling 失败", exc_info=True)
+        root.geometry("1120x700")
+        root.minsize(880, 520)
 
+        self._build_menu()
         self._build_toolbar()
         self._build_body()
         self._build_statusbar()
@@ -82,6 +102,61 @@ class DesktopApp:
     def _t(self, key, **kwargs):
         text = translate(key, self.lang)
         return text.format(**kwargs) if kwargs else text
+
+    def _apply_theme(self):
+        """跨平台外观：优先用各平台的现代主题，再按系统深浅色微调。"""
+        style = ttk.Style(self.root)
+        for candidate in ("vista", "aqua", "clam"):
+            if candidate in style.theme_names():
+                try:
+                    style.theme_use(candidate)
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+        # 显式指定字体家族：空字体名在 Windows 上会退化成宋体
+        base = default_font_family()
+        try:
+            from tkinter import font as tkfont
+
+            for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
+                try:
+                    tkfont.nametofont(name).configure(family=base)
+                except Exception:  # noqa: BLE001
+                    continue
+            self.heading_font = tkfont.Font(family=base, size=10, weight="bold")
+        except Exception:  # noqa: BLE001
+            self.heading_font = ("", 10, "bold")
+
+    def _build_menu(self):
+        """菜单栏：把不常用操作收进菜单，工具栏只留高频动作。"""
+        menubar = tk.Menu(self.root)
+
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label=self._t("export_opml"), command=self.on_export_opml)
+        file_menu.add_command(label=self._t("gui_export_json"), command=lambda: self.on_export("json"))
+        file_menu.add_command(label=self._t("gui_export_csv"), command=lambda: self.on_export("csv"))
+        file_menu.add_separator()
+        file_menu.add_command(label=self._t("gui_quit"), command=self.root.destroy)
+        menubar.add_cascade(label=self._t("gui_menu_file"), menu=file_menu)
+
+        view_menu = tk.Menu(menubar, tearoff=0)
+        self.filter_var = tk.StringVar(value="all")
+        for label_key, value in (
+            ("gui_filter_all", "all"), ("unread_only", "unread"), ("gui_bookmarked_only", "bookmarked"),
+        ):
+            view_menu.add_radiobutton(
+                label=self._t(label_key), value=value, variable=self.filter_var,
+                command=self.on_filter_changed,
+            )
+        view_menu.add_separator()
+        view_menu.add_command(label=self._t("gui_open_browser"), command=self.on_open_browser)
+        menubar.add_cascade(label=self._t("gui_menu_view"), menu=view_menu)
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label=self._t("gui_about"), command=self.on_about)
+        menubar.add_cascade(label=self._t("gui_menu_help"), menu=help_menu)
+
+        self.root.config(menu=menubar)
 
     def _build_toolbar(self):
         bar = ttk.Frame(self.root, padding=(8, 6))
@@ -102,13 +177,24 @@ class DesktopApp:
             side="left", padx=4
         )
 
+        # 搜索框：边输边过滤（300ms 防抖，避免每敲一个键就查库）
+        search_bar = ttk.Frame(self.root, padding=(8, 0))
+        search_bar.pack(fill="x")
+        ttk.Label(search_bar, text=self._t("search")).pack(side="left", padx=(0, 6))
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(search_bar, textvariable=self.search_var)
+        self.search_entry.pack(side="left", fill="x", expand=True)
+        self.search_entry.bind("<KeyRelease>", self.on_search_key)
+        self._search_job = None
+        ttk.Button(search_bar, text=self._t("gui_clear"), command=self.on_clear_search).pack(side="left", padx=6)
+
     def _build_body(self):
         body = ttk.Panedwindow(self.root, orient="horizontal")
         body.pack(fill="both", expand=True, padx=8, pady=4)
 
         # 左：订阅源
         left = ttk.Frame(body)
-        ttk.Label(left, text=self._t("sources"), font=("", 10, "bold")).pack(anchor="w")
+        ttk.Label(left, text=self._t("sources"), font=self.heading_font).pack(anchor="w")
         self.feed_tree = ttk.Treeview(
             left, columns=("name", "category", "interval", "state", "unread", "fetched"),
             show="headings", selectmode="browse", height=18,
@@ -124,19 +210,29 @@ class DesktopApp:
 
         # 右：文章
         right = ttk.Frame(body)
-        self.article_label = ttk.Label(right, text=self._t("articles"), font=("", 10, "bold"))
+        self.article_label = ttk.Label(right, text=self._t("articles"), font=self.heading_font)
         self.article_label.pack(anchor="w")
         self.article_tree = ttk.Treeview(
-            right, columns=("title", "published", "read"), show="headings", selectmode="browse",
+            right, columns=("title", "source", "published", "read", "mark"),
+            show="headings", selectmode="browse",
         )
         for column, key, width in (
-            ("title", "gui_article_title", 420), ("published", "gui_published", 140),
-            ("read", "gui_read_state", 70),
+            ("title", "gui_article_title", 380), ("source", "sources", 120),
+            ("published", "gui_published", 130), ("read", "gui_read_state", 60),
+            ("mark", "collections", 40),
         ):
             self.article_tree.heading(column, text=self._t(key))
             self.article_tree.column(column, width=width, anchor="w")
         self.article_tree.pack(fill="both", expand=True)
         self.article_tree.bind("<Double-1>", lambda event: self.on_open_article())
+        # 右键菜单：收藏 / 标记已读未读
+        self.article_menu = tk.Menu(self.root, tearoff=0)
+        self.article_menu.add_command(label=self._t("gui_toggle_bookmark"), command=self.on_toggle_bookmark)
+        self.article_menu.add_command(label=self._t("mark_read"), command=lambda: self.on_mark(True))
+        self.article_menu.add_command(label=self._t("mark_unread"), command=lambda: self.on_mark(False))
+        self.article_tree.bind("<Button-3>", self.on_article_right_click)   # Windows / Linux
+        self.article_tree.bind("<Button-2>", self.on_article_right_click)   # macOS
+        self.article_tree.bind("<Control-Button-1>", self.on_article_right_click)
 
         body.add(left, weight=1)
         body.add(right, weight=2)
@@ -146,7 +242,7 @@ class DesktopApp:
         bar.pack(fill="x")
         self.status_var = tk.StringVar(value=self._t("gui_ready"))
         ttk.Label(bar, textvariable=self.status_var).pack(side="left")
-        ttk.Label(bar, text=f"v{__version__}").pack(side="right")
+        ttk.Label(bar, text=f"v{__version__} · {platform_name()}").pack(side="right")
 
     # -- 数据加载 --------------------------------------------------------- #
     def refresh_feeds(self):
@@ -171,19 +267,155 @@ class DesktopApp:
             self.feed_tree.selection_set(str(selected))
         self.status_var.set(self._t("gui_summary", feeds=len(rows), unread=total))
 
-    def load_articles(self, source_id):
+    def load_articles(self, source_id=None):
+        """按当前过滤条件（全部/未读/收藏）与搜索词加载文章。
+
+        搜索走 app.search.search_articles，与网页版共用同一套匹配与转义逻辑。
+        """
+        keyword = self.search_var.get().strip() if hasattr(self, "search_var") else ""
+        mode = self.article_filter
         with self.app.app_context():
-            articles = list_articles(source_id=source_id)
+            if keyword:
+                from app.search import search_articles
+
+                pagination = search_articles(
+                    keyword, source_id=source_id, unread_only=(mode == "unread"),
+                    bookmarked_only=(mode == "bookmarked"), page=1, per_page=300,
+                )
+                articles = list(pagination.items)
+            else:
+                articles = list_articles(
+                    source_id=source_id, unread_only=(mode == "unread"),
+                    bookmarked_only=(mode == "bookmarked"), limit=300,
+                )
+            sources = {feed.id: (feed.name or feed.url) for feed in list_feeds()}
             rows = [
                 (
-                    str(article.id), article.title or "", str(article.published or "")[:19],
+                    str(article.id),
+                    article.title or "",
+                    sources.get(article.source_id, ""),
+                    str(article.published or "")[:19],
                     self._t("gui_read") if article.read else self._t("unread"),
+                    "★" if article.bookmarked else "",
                 )
                 for article in articles
             ]
         self.article_tree.delete(*self.article_tree.get_children())
         for row in rows:
             self.article_tree.insert("", "end", iid=row[0], values=row[1:])
+        self.article_label.config(text=f"{self._t('articles')} ({len(rows)})")
+
+    def on_search_key(self, event=None):
+        """防抖：停止输入 300ms 后再查，避免每敲一个键都查库。"""
+        if getattr(self, "_search_job", None):
+            self.root.after_cancel(self._search_job)
+        self._search_job = self.root.after(300, lambda: self.load_articles(self.current_source_id))
+
+    def on_clear_search(self):
+        if hasattr(self, "search_var"):
+            self.search_var.set("")
+        self.load_articles(self.current_source_id)
+
+    def on_filter_changed(self):
+        self.article_filter = self.filter_var.get()
+        self.load_articles(self.current_source_id)
+
+    def on_article_right_click(self, event):
+        row = self.article_tree.identify_row(event.y)
+        if row:
+            self.article_tree.selection_set(row)
+        try:
+            self.article_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.article_menu.grab_release()
+
+    def on_toggle_bookmark(self):
+        from app.services import toggle_bookmark
+
+        article = self.selected_article()
+        if article is None:
+            return
+        updated = self._guard(lambda: toggle_bookmark(article.id))
+        if updated is not None:
+            self.status_var.set(
+                self._t("msg_bookmark_on") if updated.bookmarked else self._t("msg_bookmark_off")
+            )
+            self.load_articles(self.current_source_id)
+
+    def on_mark(self, read):
+        from app.services import mark_read
+
+        article = self.selected_article()
+        if article is None:
+            return
+        self._guard(lambda: mark_read(article.id, read))
+        self.load_articles(self.current_source_id)
+
+    def on_export(self, fmt):
+        """导出到用户选择的文件；格式由后缀决定。"""
+        from tkinter import filedialog
+
+        from app.exporter import (
+            export_articles_csv,
+            export_articles_json,
+            export_articles_markdown,
+        )
+
+        exporters = {"json": export_articles_json, "csv": export_articles_csv, "md": export_articles_markdown}
+        suffix = {"json": ".json", "csv": ".csv", "md": ".md"}[fmt]
+        path = filedialog.asksaveasfilename(
+            title=self._t("gui_export"), defaultextension=suffix,
+            initialfile=f"rss-export{suffix}",
+            filetypes=[(fmt.upper(), f"*{suffix}"), (self._t("gui_all_files"), "*.*")],
+        )
+        if not path:
+            return
+        try:
+            with self.app.app_context():
+                payload = exporters[fmt](unread_only=(self.article_filter == "unread"))
+            # CSV 写 BOM，Excel 打开中文才不乱码
+            encoding = "utf-8-sig" if fmt == "csv" else "utf-8"
+            with open(path, "w", encoding=encoding, newline="") as handle:
+                handle.write(payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("导出失败")
+            messagebox.showerror(self._t("app_name"), f"{type(exc).__name__}: {exc}")
+            return
+        self.status_var.set(self._t("gui_export_done", path=path))
+
+    def on_export_opml(self):
+        from tkinter import filedialog
+
+        from app.opml import export_opml
+
+        path = filedialog.asksaveasfilename(
+            title=self._t("export_opml"), defaultextension=".opml",
+            initialfile="feeds.opml", filetypes=[("OPML", "*.opml"), (self._t("gui_all_files"), "*.*")],
+        )
+        if not path:
+            return
+        try:
+            with self.app.app_context():
+                payload = export_opml()
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("导出 OPML 失败")
+            messagebox.showerror(self._t("app_name"), f"{type(exc).__name__}: {exc}")
+            return
+        self.status_var.set(self._t("gui_export_done", path=path))
+
+    def on_about(self):
+        from app.platform_utils import console_hint, user_data_dir
+
+        messagebox.showinfo(
+            self._t("gui_about"),
+            f"RSS Aggregator {__version__}\n"
+            f"{platform_name()}\n"
+            f"Python {sys.version.split()[0]}\n\n"
+            f"{self._t('gui_data_dir')}: {user_data_dir()}\n"
+            f"{self._t('gui_start_hint')}: {console_hint()}",
+        )
 
     def selected_feed_id(self, warn=True):
         selection = self.feed_tree.selection()
@@ -300,8 +532,7 @@ class DesktopApp:
         if article.link and article.link.startswith("http"):
             webbrowser.open(article.link)
             self._guard(lambda: mark_read(article.id, True))
-            if self.current_source_id:
-                self.load_articles(self.current_source_id)
+            self.load_articles(self.current_source_id)
 
     def on_open_browser(self):
         webbrowser.open(self.base_url)
@@ -328,8 +559,7 @@ class DesktopApp:
             # 有任务刚结束时刷新列表，等于网页版的「自动刷新」
             if not running and recent and getattr(self, "_last_running", 0) > 0:
                 self.refresh_feeds()
-                if self.current_source_id:
-                    self.load_articles(self.current_source_id)
+                self.load_articles(self.current_source_id)
             self._last_running = len(running)
         except Exception:  # noqa: BLE001 - 轮询失败不能中断界面
             logger.debug("状态轮询失败", exc_info=True)
@@ -413,6 +643,8 @@ def main(argv=None):
         ensure_schema(app)
     init_scheduler(app)
 
+    # 必须在创建窗口之前：Windows 上先声明 DPI 感知，窗口才不会被系统拉伸糊掉
+    enable_high_dpi()
     server, _thread = start_server(app, host, port)
     base_url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '') else host}:{port}"
 
@@ -420,10 +652,16 @@ def main(argv=None):
         root = tk.Tk()
     except tk.TclError as exc:  # 无图形环境（例如服务器上 ssh）
         logger.error("无法创建窗口（当前环境没有图形界面）: %s", exc)
-        print("当前环境无法显示图形界面，请改用网页版：python main.py 后访问", base_url)
+        print(
+            "当前环境无法显示图形界面，请改用网页版 / No display available, use the web UI:\n"
+            f"  {'python' if sys.platform.startswith('win') else 'python3'} main.py\n"
+            f"  {base_url}\n"
+            f"(启动命令 / start command: {console_hint()})"
+        )
         server.shutdown()
         return 2
 
+    logger.info("桌面 GUI 启动于 %s（%s）", platform_name(), base_url)
     DesktopApp(root, app, base_url, lang=app.config.get("APP_LANGUAGE", "zh"))
     if not args.no_browser:
         webbrowser.open(base_url)

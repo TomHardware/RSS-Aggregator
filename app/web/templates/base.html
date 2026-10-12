@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to content / 跳到正文</a>
+
+    <header class="app-header">
+        <h1>{{ app_name }}</h1>
+        {% block header_stats %}
+            <span class="stat"><strong>{{ total_unread }}</strong> {{ _('unread_counter') }}</span>
+        {% endblock %}
+        <span class="spacer"></span>
+        <nav class="app-nav">{% block nav %}{% endblock %}</nav>
+        <button type="button" id="theme-toggle" class="btn btn-icon" aria-label="{{ _('theme_toggle') }}">☾</button>
+        {% if auth_enabled %}
+            <form action="{{ url_for('web.logout') }}" method="post" style="display:inline">
+                <button type="submit" class="btn">{{ _('logout') }}</button>
+            </form>
+        {% endif %}
+    </header>
+
+    <div id="task-status" class="task-status" data-endpoint="{{ url_for('web.api_status') }}" role="status" aria-live="polite"></div>
+    <div class="progress" id="task-progress" hidden><span></span></div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes">{% for message in messages %}<li>{{ message }}</li>{% endfor %}</ul>
+      {% endif %}
+    {% endwith %}
+
+    <main id="main">{% block content %}{% endblock %}</main>
+
+    <footer class="app-footer">{{ app_name }} {{ app_version }}</footer>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

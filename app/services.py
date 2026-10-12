@@ -70,7 +70,7 @@ def get_feed(source_id):
     return source
 
 
-def list_articles(source_id=None, unread_only=False, limit=200):
+def list_articles(source_id=None, unread_only=False, bookmarked_only=False, limit=200):
     query = Article.query
     if source_id:
         query = query.filter(Article.source_id == source_id)
@@ -78,6 +78,8 @@ def list_articles(source_id=None, unread_only=False, limit=200):
         from sqlalchemy import or_
 
         query = query.filter(or_(Article.read.is_(False), Article.read.is_(None)))
+    if bookmarked_only:
+        query = query.filter(Article.bookmarked.is_(True))
     return (
         query.order_by(Article.published.desc(), Article.id.desc()).limit(limit).all()
     )
@@ -214,6 +216,16 @@ def mark_read(article_id, read=True):
     if article is None:
         raise ServiceError("msg_article_not_found")
     article.read = read
+    db.session.commit()
+    return article
+
+
+def toggle_bookmark(article_id):
+    """切换收藏状态，返回更新后的文章（界面据此显示新状态）。"""
+    article = db.session.get(Article, article_id)
+    if article is None:
+        raise ServiceError("msg_article_not_found")
+    article.bookmarked = not bool(article.bookmarked)
     db.session.commit()
     return article
 

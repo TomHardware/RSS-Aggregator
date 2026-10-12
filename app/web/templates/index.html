@@ -3,153 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
     <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <!-- 主题脚本必须同步执行：否则深色模式下会闪一帧白底 -->
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
 <body>
-    <header>
+    <a class="skip-link" href="#main">Skip to content / 跳到正文</a>
+
+    <header class="app-header">
         <h1>{{ app_name }}</h1>
-        <p>
-            <a href="{{ lang_url('en') }}">English</a> | <a href="{{ lang_url('zh') }}">中文</a>
-            &nbsp;·&nbsp; <strong id="unread-total">{{ _('unread_total', count=total_unread) }}</strong>
-            {% if auth_enabled %}
-                &nbsp;·&nbsp; <small>{{ _('logged_in_as', name=current_user) }}</small>
-                <form action="{{ url_for('web.logout') }}" method="post" style="display:inline">
-                    <button type="submit">{{ _('logout') }}</button>
-                </form>
-            {% endif %}
-        </p>
-        <!-- 前端轮询：显示后台抓取进展，抓完自动刷新页面 -->
-        <p id="task-status" class="task-status" data-endpoint="{{ url_for('web.api_status') }}"></p>
+        <span class="stat">
+            <strong id="unread-total">{{ total_unread }}</strong> {{ _('unread_counter') }}
+        </span>
+        <span class="stat">{{ _('console_counts', sources=sources|length, articles=article_count|default(0)) }}</span>
+
+        <span class="spacer"></span>
+
+        <nav class="app-nav">
+            <a class="btn" href="{{ url_for('web.index') }}">{{ _('console_home') }}</a>
+            <a class="btn" href="{{ url_for('web.bookmarks') }}">★ {{ _('bookmarks') }}</a>
+            <a class="btn" href="{{ url_for('web.console') }}">{{ _('console_title') }}</a>
+        </nav>
+        <button type="button" id="theme-toggle" class="btn btn-icon" aria-label="{{ _('theme_toggle') }}">☾</button>
+        {% if auth_enabled %}
+            <form action="{{ url_for('web.logout') }}" method="post" style="display:inline">
+                <button type="submit" class="btn">{{ _('logout') }}</button>
+            </form>
+        {% endif %}
     </header>
+
+    <!-- 轮询：显示后台抓取进展，抓完自动刷新 -->
+    <div id="task-status" class="task-status" data-endpoint="{{ url_for('web.api_status') }}" role="status" aria-live="polite"></div>
+    <div class="progress" id="task-progress" hidden><span></span></div>
 
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <ul class="flashes">
-          {% for message in messages %}
-            <li>{{ message }}</li>
-          {% endfor %}
+          {% for message in messages %}<li>{{ message }}</li>{% endfor %}
         </ul>
       {% endif %}
     {% endwith %}
 
-    <hr>
-
-    <!-- 搜索表单 -->
-    <form action="{{ url_for('web.search') }}" method="get">
-        <input type="text" name="q" placeholder="{{ _('search') }}" value="{{ search_query|default('') }}">
-        <select name="source_id">
-            <option value="">{{ _('all_sources') }}</option>
-            {% for s in sources %}
-            <option value="{{ s.id }}" {% if search_source_id == s.id %}selected{% endif %}>{{ s.name }}</option>
-            {% endfor %}
-        </select>
-        <label><input type="checkbox" name="unread" value="true" {% if search_unread %}checked{% endif %}> {{ _('unread_only') }}</label>
-        <button type="submit">{{ _('search') }}</button>
-    </form>
-
-    <!-- 添加源表单 -->
-    <form action="{{ url_for('web.add_source') }}" method="post">
-        <input type="text" name="name" placeholder="{{ _('name') }}">
-        <input type="url" name="url" placeholder="RSS URL" required>
-        <input type="text" name="category" placeholder="{{ _('category') }}">
-        <input type="number" name="interval" value="30" min="5" title="{{ _('interval') }}">
-        <button type="submit">{{ _('add_source') }}</button>
-    </form>
-
-    <!-- OPML 导入导出 -->
-    <div>
-        <a href="{{ url_for('web.export_opml_route') }}">{{ _('export_opml') }}</a>
-        <form action="{{ url_for('web.import_opml_route') }}" method="post" enctype="multipart/form-data" style="display:inline">
-            <input type="file" name="opml_file" accept=".opml,.xml" required>
-            <button type="submit">{{ _('import_opml') }}</button>
-        </form>
-    </div>
-
-    <h2>{{ _('sources') }}</h2>
-    <ul class="sources">
-    {% for source in sources %}
-        <li>
-            <strong>{{ source.name }}</strong>
-            ({{ source.category }}) - {{ source.url }}
-            {% if not source.enabled %}<em>[{{ _('paused') }}]</em>{% endif %}
-            <small>{{ _('unread_total', count=unread_counts.get(source.id, 0)) }}</small>
-            <small>{{ _('last_fetched') }}:
-                {{ source.last_fetched if source.last_fetched else _('never_fetched') }}
-            </small>
-
-            <form action="{{ url_for('web.refresh_source', source_id=source.id) }}" method="post" style="display:inline">
-                <button type="submit">{{ _('refresh') }}</button>
+    <main id="main">
+        <!-- 搜索与过滤 -->
+        <section class="card">
+            <form action="{{ url_for('web.search') }}" method="get" class="row">
+                <input type="search" name="q" placeholder="{{ _('search') }}" value="{{ search_query|default('') }}"
+                       maxlength="200" style="flex:1 1 220px">
+                <select name="source_id">
+                    <option value="">{{ _('all_sources') }}</option>
+                    {% for source in sources %}
+                        <option value="{{ source.id }}" {% if search_source_id == source.id %}selected{% endif %}>{{ source.name }}</option>
+                    {% endfor %}
+                </select>
+                <label class="row" style="gap:4px">
+                    <input type="checkbox" name="unread" value="true" {% if search_unread %}checked{% endif %}>
+                    {{ _('unread_only') }}
+                </label>
+                <label class="row" style="gap:4px">
+                    <input type="checkbox" name="bookmarked" value="true" {% if search_bookmarked %}checked{% endif %}>
+                    {{ _('gui_bookmarked_only') }}
+                </label>
+                <button type="submit" class="btn-primary">{{ _('search') }}</button>
+                <a class="btn" href="{{ url_for('web.index') }}">{{ _('gui_clear') }}</a>
             </form>
-            <form action="{{ url_for('web.toggle_source', source_id=source.id) }}" method="post" style="display:inline">
-                <button type="submit">{{ _('resume') if not source.enabled else _('pause') }}</button>
-            </form>
-            <form action="{{ url_for('web.delete_source', source_id=source.id) }}" method="post" style="display:inline"
-                  onsubmit="return confirm('{{ _('delete_confirm') }}')">
-                <button type="submit">{{ _('delete_source') }}</button>
-            </form>
+            <div class="row" style="margin-top:10px">
+                <span class="pill">{{ _('export_articles') }}</span>
+                <a class="btn" href="{{ url_for('web.export_articles', fmt='json', **export_filters) }}">JSON</a>
+                <a class="btn" href="{{ url_for('web.export_articles', fmt='csv', **export_filters) }}">CSV</a>
+                <a class="btn" href="{{ url_for('web.export_articles', fmt='markdown', **export_filters) }}">Markdown</a>
+                <a class="btn" href="{{ url_for('web.export_opml_route') }}">OPML</a>
+            </div>
+        </section>
 
-            <!-- 编辑：名称 / 分类 / 更新间隔 -->
-            <details>
-                <summary>{{ _('edit_source') }}</summary>
-                <form action="{{ url_for('web.edit_source', source_id=source.id) }}" method="post">
-                    <label>{{ _('name') }}<input type="text" name="name" value="{{ source.name }}"></label>
-                    <label>{{ _('category') }}<input type="text" name="category" value="{{ source.category }}"></label>
-                    <label>{{ _('interval') }}<input type="number" name="interval" min="5" value="{{ source.interval }}"></label>
-                    <button type="submit">{{ _('save') }}</button>
-                </form>
-            </details>
-        </li>
-    {% endfor %}
-    </ul>
+        <!-- 添加订阅源 -->
+        <section class="card">
+            <h2>{{ _('gui_add_feed') }}</h2>
+            <form action="{{ url_for('web.add_source') }}" method="post" class="row">
+                <input type="text" name="name" placeholder="{{ _('name') }}" maxlength="200" style="flex:1 1 140px">
+                <input type="url" name="url" placeholder="RSS URL" required maxlength="500" style="flex:2 1 240px">
+                <input type="text" name="category" placeholder="{{ _('category') }}" maxlength="100" style="flex:1 1 110px">
+                <input type="number" name="interval" value="30" min="5" max="10080" title="{{ _('interval') }}" style="width:90px">
+                <button type="submit" class="btn-primary">{{ _('add_source') }}</button>
+            </form>
+            <form action="{{ url_for('web.import_opml_route') }}" method="post" enctype="multipart/form-data" class="row" style="margin-top:10px">
+                <input type="file" name="opml_file" accept=".opml,.xml" required>
+                <button type="submit">{{ _('import_opml') }}</button>
+            </form>
+        </section>
 
-    <h2>{{ _('articles') }}</h2>
-    {% for article in articles.items %}
-        <div class="article">
-            <h3>
-                {% if article.link and article.link.startswith('http') %}
-                    <a href="{{ article.link }}" target="_blank" rel="noopener noreferrer">{{ article.title }}</a>
+        <div class="grid">
+            <!-- 订阅源列表 -->
+            <section class="card">
+                <h2>{{ _('sources') }}</h2>
+                {% if sources %}
+                <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>{{ _('name') }}</th>
+                            <th>{{ _('category') }}</th>
+                            <th>{{ _('interval') }}</th>
+                            <th>{{ _('unread_counter') }}</th>
+                            <th>{{ _('console_actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for source in sources %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('web.search', source_id=source.id) }}">{{ source.name }}</a>
+                                {% if not source.enabled %}<span class="pill pill-warn">{{ _('paused') }}</span>{% endif %}
+                                <br><small style="color:var(--text-dim)">{{ source.url }}</small>
+                                <details>
+                                    <summary style="cursor:pointer;color:var(--text-dim);font-size:12.5px">{{ _('edit_source') }}</summary>
+                                    <form action="{{ url_for('web.edit_source', source_id=source.id) }}" method="post" class="row" style="margin-top:6px">
+                                        <input type="text" name="name" value="{{ source.name }}" maxlength="200" style="width:150px" aria-label="{{ _('name') }}">
+                                        <input type="text" name="category" value="{{ source.category }}" maxlength="100" style="width:110px" aria-label="{{ _('category') }}">
+                                        <input type="number" name="interval" value="{{ source.interval }}" min="5" max="10080" style="width:80px" aria-label="{{ _('interval') }}">
+                                        <button type="submit">{{ _('save') }}</button>
+                                    </form>
+                                </details>
+                            </td>
+                            <td>{{ source.category }}</td>
+                            <td>{{ source.interval }} min</td>
+                            <td>
+                                {% set count = unread_counts.get(source.id, 0) %}
+                                {% if count %}<span class="pill pill-unread">{{ count }}</span>{% else %}<span class="pill">0</span>{% endif %}
+                            </td>
+                            <td>
+                                <form action="{{ url_for('web.refresh_source', source_id=source.id) }}" method="post" style="display:inline">
+                                    <button type="submit" class="btn">{{ _('refresh') }}</button>
+                                </form>
+                                <form action="{{ url_for('web.toggle_source', source_id=source.id) }}" method="post" style="display:inline">
+                                    <button type="submit" class="btn">{{ _('resume') if not source.enabled else _('pause') }}</button>
+                                </form>
+                                <form action="{{ url_for('web.delete_source', source_id=source.id) }}" method="post" style="display:inline"
+                                      onsubmit="return confirm('{{ _('delete_confirm') }}')">
+                                    <button type="submit" class="btn btn-danger">{{ _('delete_source') }}</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
                 {% else %}
-                    {{ article.title }}
+                    <p>{{ _('console_no_feeds') }}</p>
                 {% endif %}
-                {% if not article.read %}<small>[{{ _('unread') }}]</small>{% endif %}
-            </h3>
-            <p>{{ (article.summary or '')|truncate(200) }}</p>
-            {% if article.content %}
-                <p>{{ article.content|truncate(300) }}</p>
-            {% endif %}
-            {% if article.published %}<small>{{ article.published }}</small>{% endif %}
-            <form action="{{ url_for('web.mark_read' if not article.read else 'web.mark_unread', article_id=article.id) }}" method="post" style="display:inline">
-                <input type="hidden" name="next" value="{{ request.full_path }}">
-                <button type="submit">{{ _('mark_read') if not article.read else _('mark_unread') }}</button>
-            </form>
+            </section>
+
+            <!-- 文章列表 -->
+            <section class="card">
+                <h2>{{ _('articles') }} ({{ articles.total }})</h2>
+                {% if articles.items %}
+                    {% for article in articles.items %}
+                    <article class="article {% if article.read %}is-read{% endif %}" id="article-{{ article.id }}">
+                        <h3><a href="{{ article.link }}" target="_blank" rel="noopener noreferrer">{{ article.title }}</a></h3>
+                        <div class="meta">
+                            <span>{{ source_names.get(article.source_id, '') }}</span>
+                            <span>{{ article.published or '' }}</span>
+                            {% if article.summary %}
+                                <span>{{ _('reading_time', minutes=[1, (article.summary|length // 500) + 1]|max) }}</span>
+                            {% endif %}
+                            <button type="button" class="btn btn-icon bookmark-toggle"
+                                    data-url="{{ url_for('web.bookmark_article', article_id=article.id, ajax=1) }}"
+                                    aria-pressed="{{ 'true' if article.bookmarked else 'false' }}"
+                                    aria-label="{{ _('mark_bookmark') }}">{{ '★' if article.bookmarked else '☆' }}</button>
+                            <form action="{{ url_for('web.mark_unread' if article.read else 'web.mark_read', article_id=article.id) }}" method="post" style="display:inline">
+                                <button type="submit" class="btn btn-icon">{{ _('mark_unread') if article.read else _('mark_read') }}</button>
+                            </form>
+                        </div>
+                        {% if article.summary %}<p class="summary">{{ article.summary[:300] }}{% if article.summary|length > 300 %}…{% endif %}</p>{% endif %}
+                    </article>
+                    {% endfor %}
+
+                    {% if articles.pages > 1 %}
+                    <nav class="row" style="margin-top:12px" aria-label="pagination">
+                        {% if articles.has_prev %}<a class="btn" href="{{ page_url(articles.prev_num) }}">← {{ _('previous') }}</a>{% endif %}
+                        <span class="pill">{{ articles.page }} / {{ articles.pages }}</span>
+                        {% if articles.has_next %}<a class="btn" href="{{ page_url(articles.next_num) }}">{{ _('next') }} →</a>{% endif %}
+                    </nav>
+                    {% endif %}
+                {% else %}
+                    <p>{{ _('no_articles') }}</p>
+                {% endif %}
+            </section>
         </div>
-    {% else %}
-        <p>{{ _('no_articles') }}</p>
-    {% endfor %}
+    </main>
 
-    <!-- 分页导航：page_url 会保留 q / source_id / unread / lang 等条件 -->
-    {% if articles.pages > 1 %}
-    <div class="pagination">
-        {% if articles.has_prev %}
-            <a href="{{ page_url(articles.prev_num) }}">{{ _('previous') }}</a>
-        {% endif %}
-        <span>{{ _('page') }} {{ articles.page }} / {{ articles.pages }}</span>
-        {% if articles.has_next %}
-            <a href="{{ page_url(articles.next_num) }}">{{ _('next') }}</a>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    <hr>
-    <footer>
-        <small>{{ app_name }} {{ app_version }}</small>
+    <footer class="app-footer">
+        {{ app_name }} {{ app_version }}
     </footer>
 
     <script>
-    // 任务状态轮询：默认 5 秒一次；发现「刚跑完的抓取」就刷新页面，
-    // 这样添加源之后新文章会自动出现，不用手动刷新。
+    // 任务状态轮询：显示抓取进展，抓取结束后自动刷新页面。
     (function () {
         const box = document.getElementById('task-status');
+        const bar = document.getElementById('task-progress');
         if (!box || !window.fetch) return;
         const endpoint = box.dataset.endpoint;
         const L = {{ {
@@ -158,7 +211,6 @@
             "done": _("task_done"),
             "failed": _("task_failed"),
         } | tojson }};
-        const INTERVAL = 5000;
         let known = new Set();
         let primed = false;
 
@@ -180,15 +232,13 @@
                     credentials: 'same-origin',
                     cache: 'no-store',
                 });
-                if (resp.status === 401) { window.location.reload(); return; }  // 会话过期
+                if (resp.status === 401) { window.location.reload(); return; }
                 if (!resp.ok) return;
                 const data = await resp.json();
-
                 const running = data.running || [];
                 const recent = data.recent || [];
                 const nowRunning = new Set(running.map(t => t.id));
 
-                // 曾经在跑、现在不在跑了 → 抓取刚结束，刷新页面让新文章出现
                 if (primed && Array.from(known).some(id => !nowRunning.has(id))) {
                     window.location.reload();
                     return;
@@ -198,24 +248,50 @@
 
                 const counter = document.getElementById('unread-total');
                 if (counter && typeof data.unread_total === 'number') {
-                    counter.textContent = counter.textContent.replace(/[\d,]+/, data.unread_total);
+                    counter.textContent = data.unread_total;
                 }
 
                 if (running.length) {
                     box.textContent = running.map(label).join(' · ');
-                } else if (recent.length) {
-                    box.textContent = label(recent[0]);
+                    box.classList.add('is-active');
+                    if (bar) bar.hidden = false;
                 } else {
-                    box.textContent = '';
+                    box.classList.remove('is-active');
+                    if (bar) bar.hidden = true;
+                    box.textContent = recent.length ? label(recent[0]) : '';
                 }
             } catch (err) {
-                /* 网络抖动忽略，下一轮再试 */
+                /* 网络抖动忽略 */
             }
         }
 
         poll();
-        setInterval(poll, INTERVAL);
+        setInterval(poll, 5000);
     })();
+
+    // 收藏按钮：无刷新切换（失败时回退到整页提交）
+    document.addEventListener('click', async function (event) {
+        const button = event.target.closest('.bookmark-toggle');
+        if (!button) return;
+        event.preventDefault();
+        const wasOn = button.getAttribute('aria-pressed') === 'true';
+        button.disabled = true;
+        try {
+            const resp = await fetch(button.dataset.url, {
+                method: 'POST',
+                headers: {'Accept': 'application/json'},
+                credentials: 'same-origin',
+            });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+            button.textContent = data.bookmarked ? '★' : '☆';
+            button.setAttribute('aria-pressed', data.bookmarked ? 'true' : 'false');
+        } catch (err) {
+            button.textContent = wasOn ? '★' : '☆';
+        } finally {
+            button.disabled = false;
+        }
+    });
     </script>
 </body>
 </html>

@@ -8,6 +8,52 @@
 
 ---
 
+## [2.0.5] - 2026-10-11
+
+界面与跨平台版本：重做网页视觉与主题、新增收藏与导出等高级功能，并修复 5 项缺陷。
+UI and cross-platform release: a redesigned web interface with themes, new advanced features such as bookmarks and export, plus five bug fixes.
+
+### 新增功能 / Added
+
+- **浅色与深色主题**：网页自动跟随系统深浅色，也可手动切换，选择按浏览器记住，切换时不闪白屏。
+- *Light and dark themes: the web UI follows the system preference, can be switched manually, remembers the choice per browser, and never flashes white on load.*
+- **全新的网页视觉**：统一的设计系统（配色、间距、卡片、按钮、表格、状态标签），页面结构更清晰，窄屏也能正常使用。
+- *A redesigned web interface: one design system for colors, spacing, cards, buttons, tables and status pills, with a clearer layout that also works on narrow screens.*
+- **无障碍与动效偏好**：键盘焦点可见、提供「跳到正文」链接、支持系统「减少动态效果」设置。
+- *Accessibility and motion preferences: visible keyboard focus, a "skip to content" link, and respect for the system "reduce motion" setting.*
+- **收藏**：任意文章可加星收藏，并提供「只看收藏」页面；网页上点击即时生效无需刷新。
+- *Bookmarks: star any article and browse a bookmarks-only page; the web UI applies the change instantly without a reload.*
+- **数据导出**：文章可导出为 JSON（完整备份，含订阅源）、CSV（带 BOM，Excel 打开中文不乱码）与 Markdown（按源分组的阅读归档）。
+- *Data export: articles can be exported as JSON (full backup including feeds), CSV (with BOM so Excel shows Chinese correctly) and Markdown (a reading archive grouped by feed).*
+- **导出跟随当前筛选**：搜索、未读、收藏等过滤条件会带进导出链接，导出的内容与眼前看到的一致。
+- *Export follows the current filter: search, unread and bookmark filters carry over to the export link, so the file matches what you see.*
+- **桌面 GUI 增强**：新增菜单栏、输入即搜（300 毫秒防抖）的搜索框、右键收藏与已读/未读、三种格式的导出，以及「关于」对话框。
+- *Desktop GUI improvements: a menu bar, instant debounced search, right-click bookmark and read/unread actions, export in three formats, and an About dialog.*
+- **跨平台适配**：按平台惯例定位数据目录（Windows 用 `%APPDATA%`、macOS 用 `Application Support`、Linux 用 XDG），Windows 高分屏 DPI 感知与终端 UTF-8 编码处理，各平台使用正确的默认字体，无图形界面时给出可复制的替代命令。
+- *Cross-platform support: per-platform data directories (`%APPDATA%` on Windows, `Application Support` on macOS, XDG on Linux), Windows high-DPI awareness and UTF-8 console encoding, correct default fonts per platform, and a copy-pasteable fallback command when no display is available.*
+- **文章列表信息更全**：显示来源、预估阅读时长与收藏状态。
+- *Richer article list: each entry now shows its feed, an estimated reading time and its bookmark state.*
+
+### 修复 / Fixed
+
+- **桌面窗口字体错误**：`font=("", 10, "bold")` 里的空字体名不会继承主题字体，Windows 上会退化成宋体；现在按平台显式指定正确字体。
+- *Wrong desktop fonts: an empty family name such as `font=("", 10, "bold")` does not inherit the theme font and fell back to a poor default (SimSun on Windows); the correct per-platform font is now used explicitly.*
+- **高分屏界面模糊**：Windows 下未声明 DPI 感知，窗口被系统拉伸；现在启动时声明并按真实 DPI 调整缩放。
+- *Blurry UI on high-DPI screens: Windows was never told the process is DPI aware, so the window was stretched; it is now declared at startup and scaling follows the real DPI.*
+- **Windows 控制台中文日志乱码**：默认 GBK 编码会破坏日志；现在把标准输出切换为 UTF-8。
+- *Garbled Chinese logs on Windows: the default GBK console encoding corrupted log output; standard streams are now switched to UTF-8.*
+- **静态样式文件 404**：样式与脚本放在了 `app/web/static/`，而 Flask 只伺服 `app/static/`，导致新界面完全没有样式。
+- *Static assets returned 404: styles and scripts lived in `app/web/static/` while Flask only serves `app/static/`, so the new interface rendered unstyled.*
+- **导出与模板引用错误**：导出器引用了模型里不存在的字段，模板引用了不存在的路由端点，都会直接报 500。
+- *Export and template reference errors: the exporter read a model field that does not exist and a template built a URL for a route that does not exist, both causing 500 responses.*
+
+### 兼容性 / Compatibility
+
+- 老数据库启动时自动补上 `article.bookmarked` 列，无需手工迁移。
+- *Existing databases get the `article.bookmarked` column added automatically at startup; no manual migration is needed.*
+- 无需新增任何第三方依赖，桌面 GUI 仍然只用 Python 自带的 tkinter。
+- *No new third-party dependency: the desktop GUI still uses only the bundled tkinter.*
+
 ## [2.0.4] - 2026-10-11
 
 本地 GUI 版本：新增桌面窗口与网页控制台，并修复 4 项缺陷、补齐任务可见性功能。

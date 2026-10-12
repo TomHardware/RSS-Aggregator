@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**当前版本：2.0.4** &nbsp;·&nbsp; `/healthz` 也会返回版本号。
+**当前版本：2.0.5** &nbsp;·&nbsp; `/healthz` 也会返回版本号。
 
 一个功能丰富、可自托管的 RSS 订阅聚合器。支持定时抓取、OPML 导入导出、全文提取、关键词搜索过滤、邮件通知，并提供中英文双语 Web 界面。适合个人或团队用于信息聚合、内容监控和阅读管理。
 
@@ -28,6 +28,11 @@
 - **自定义更新频率**：每个源可单独配置抓取间隔，灵活控制资源占用。
 - **任务可见**：后台抓取会被登记，并通过 `GET /api/status` 暴露；网页每 5 秒轮询一次，显示正在抓取什么、抓完自动刷新。
 - **本地桌面 GUI**：运行 `python desktop_gui.py` 打开原生窗口（tkinter，随 Python 自带）管理订阅源与阅读文章；窗口内会同时启动同一套 Web 服务，浏览器也能同时用。
+- **跨平台**：Windows、macOS、Linux 都做了适配——按平台惯例存放数据、Windows 高分屏与终端编码处理、各平台正确的默认字体。
+- **浅色与深色主题**：网页自动跟随系统深浅色，也可以手动切换；选择会按浏览器记住。
+- **收藏**：任意文章可加星，并按「只看收藏」过滤，网页与桌面窗口都支持。
+- **数据导出**：文章可导出为 JSON（完整备份）、CSV（Excel 可直接打开）或 Markdown（阅读归档）。
+- **桌面增强**：菜单栏、输入即搜的防抖搜索、右键收藏与已读/未读操作、导出到文件。
 - **网页控制台**：`/console` 提供紧凑的仪表盘与批量操作（全部抓取、暂停/恢复、编辑、删除），适合用浏览器时使用。
 - **邮件推送通知**：配置 SMTP 后，抓取到新文章可自动发送邮件提醒。
 - **Docker 部署**：提供 Dockerfile 和 docker-compose.yaml，方便快速部署。
@@ -67,6 +72,8 @@ rss_aggregator/
 │   ├── retention.py         # 文章保留策略（每源条数 / 天数）
 │   ├── tasks.py             # 后台任务登记表（供 /api/status 使用）
 │   ├── services.py          # 网页、控制台与桌面 GUI 共用的业务操作
+│   ├── exporter.py          # 文章导出：JSON / CSV / Markdown
+│   ├── platform_utils.py    # Windows / macOS / Linux 差异集中处理
 │   ├── gui.py               # 桌面 GUI（tkinter，无需额外依赖）
 │   ├── i18n.py              # 中英文翻译
 │   ├── opml.py              # OPML 导入导出
@@ -78,6 +85,7 @@ rss_aggregator/
 │       ├── routes.py        # 路由与视图
 │       └── templates/
 │           ├── index.html   # 主页面模板
+│           ├── base.html    # 公共布局（页头、主题切换、轮询）
 │           ├── login.html   # 登录页模板
 │           └── console.html # 网页控制台（仪表盘 + 批量操作）
 ├── tests/
@@ -86,6 +94,8 @@ rss_aggregator/
 │   ├── test_v14_bugs.py       # v1.4 审查用例 + 仓库布局检查（7 例）
 │   ├── test_v2_bugs.py        # v2.0.1 功能与修复用例（16 例）
 │   ├── test_v202_bugs.py      # v2.0.2 任务接口、轮询与修复用例（14 例）
+│   ├── test_v204_bugs.py      # v2.0.4 GUI 与控制台用例（14 例）
+│   ├── test_v205_bugs.py      # v2.0.5 界面、收藏、导出与跨平台用例
 │   ├── test_e2e_smoke.py      # 端到端冒烟测试（会真的启动服务）
 │   └── test_debug_reloader.py # 验证 --debug 下调度器只启动一次
 ├── main.py                  # 网页版入口

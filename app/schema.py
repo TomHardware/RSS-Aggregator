@@ -30,6 +30,8 @@ INDEX_DDL = (
 # (表, 列, SQLite 默认值, 其他数据库默认值)
 COLUMN_MIGRATIONS = (
     ("source", "enabled", "1", "TRUE"),
+    # v2.0.5 新增：收藏标记，配合「只看收藏」过滤
+    ("article", "bookmarked", "0", "FALSE"),
 )
 
 _FIND_DUPLICATES = text(

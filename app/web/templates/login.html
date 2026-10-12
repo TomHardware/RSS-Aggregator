@@ -1,35 +1,29 @@
-<!DOCTYPE html>
-<html lang="{{ lang }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ _('login_title') }} - {{ app_name }}</title>
-</head>
-<body>
-    <h1>{{ app_name }}</h1>
+{% extends "base.html" %}
+{% block title %}{{ _('login_title') }} · {{ app_name }}{% endblock %}
+{% block header_stats %}{% endblock %}
+{% block nav %}{% endblock %}
+{% block content %}
+<section class="card" style="max-width:420px;margin:8vh auto">
     <h2>{{ _('login_title') }}</h2>
-    <p>{{ _('login_required_hint') }}</p>
+    <p style="color:var(--text-dim)">{{ _('login_required_hint') }}</p>
 
     {% if error %}
-        <p class="error">{{ error }}</p>
+        <p class="pill pill-warn" role="alert">{{ error }}</p>
     {% endif %}
 
     <form method="post" action="{{ url_for('web.login') }}">
         <input type="hidden" name="next" value="{{ next or '' }}">
         <p>
-            <label>{{ _('username') }}
-                <input type="text" name="username" autocomplete="username" required autofocus>
-            </label>
+            <label for="username">{{ _('username') }}</label><br>
+            <input type="text" id="username" name="username" autocomplete="username" required autofocus
+                   style="width:100%" maxlength="200">
         </p>
         <p>
-            <label>{{ _('password') }}
-                <input type="password" name="password" autocomplete="current-password" required>
-            </label>
+            <label for="password">{{ _('password') }}</label><br>
+            <input type="password" id="password" name="password" autocomplete="current-password" required
+                   style="width:100%" maxlength="200">
         </p>
-        <button type="submit">{{ _('login_submit') }}</button>
+        <button type="submit" class="btn-primary" style="width:100%">{{ _('login_submit') }}</button>
     </form>
-
-    <hr>
-    <p><small>{{ app_name }} {{ app_version }}</small></p>
-</body>
-</html>
+</section>
+{% endblock %}

@@ -42,7 +42,7 @@ fetch:
   max_entries: 50          # 每次抓取最多「新增」多少条（按新增数封顶，历史条目会逐次补齐）
   max_bytes: 8388608       # 单个 feed 响应体上限（字节，默认 8 MB），超出即截断
   initial_async: true      # 添加源后立即返回，首次抓取放到后台线程（避免请求被拖住）
-  user_agent: "RSSAggregator/2.0.4 (+https://github.com/forestwolf-ai/RSS-Aggregator)"
+  user_agent: "RSSAggregator/2.0.5 (+https://github.com/forestwolf-ai/RSS-Aggregator)"
 
 fulltext:
   enabled: true

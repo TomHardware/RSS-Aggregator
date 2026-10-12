@@ -49,6 +49,8 @@ class Article(db.Model):
     content = db.Column(db.Text)  # 全文内容
     published = db.Column(db.DateTime)
     read = db.Column(db.Boolean, default=False)
+    # v2.0.5：收藏（★）标记，用于「只看收藏」过滤与导出
+    bookmarked = db.Column(db.Boolean, default=False)
     source_id = db.Column(db.Integer, db.ForeignKey("source.id"))
 
     def __repr__(self):

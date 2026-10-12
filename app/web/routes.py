@@ -40,7 +40,7 @@ from app.auth import (
 )
 from app.fetcher import fetch_source
 from app.i18n import translate
-from app.models import Article, Source
+from app.models import Article, Source, utcnow
 from app.opml import export_opml, import_opml
 from app.search import search_articles
 from app.security import check_csrf_origin
@@ -97,6 +97,15 @@ def _translator(lang):
 def _context(**extra):
     lang = _language()
     counts, total_unread = _unread_counts()
+    # 导出链接要带上当前的过滤条件，否则「导出」导出的内容和眼前看到的不一致
+    export_filters = {}
+    if request.args.get("source_id", type=int):
+        export_filters["source_id"] = request.args.get("source_id", type=int)
+    if request.args.get("unread", "").lower() == "true":
+        export_filters["unread"] = "true"
+    if request.args.get("bookmarked", "").lower() == "true":
+        export_filters["bookmarked"] = "true"
+
     context = {
         "lang": lang,
         "_": _translator(lang),
@@ -109,6 +118,9 @@ def _context(**extra):
         "total_unread": total_unread,
         "auth_enabled": auth_enabled(),
         "current_user": current_user(),
+        "export_filters": export_filters,
+        "article_count": Article.query.count(),
+        "source_names": {source.id: (source.name or source.url) for source in Source.query.all()},
     }
     context.update(extra)
     return context
@@ -295,8 +307,11 @@ def search():
     query = request.args.get("q", "")
     source_id = request.args.get("source_id", type=int)
     unread = request.args.get("unread", "false").lower() == "true"
+    bookmarked = request.args.get("bookmarked", "false").lower() == "true"
     page = request.args.get("page", 1, type=int) or 1
-    pagination = search_articles(query, source_id, unread, page=page, per_page=PER_PAGE)
+    pagination = search_articles(
+        query, source_id, unread, page=page, per_page=PER_PAGE, bookmarked_only=bookmarked
+    )
     return render_template(
         "index.html",
         **_context(
@@ -305,7 +320,78 @@ def search():
             search_query=query,
             search_source_id=source_id,
             search_unread=unread,
+            search_bookmarked=bookmarked,
         )
+    )
+
+
+# --------------------------------------------------------------------------- #
+# 收藏与导出
+# --------------------------------------------------------------------------- #
+@web_bp.route("/article/<int:article_id>/bookmark", methods=["POST"])
+def bookmark_article(article_id):
+    """切换收藏状态；带 ?ajax=1 时返回 JSON，供页面无刷新更新。"""
+    from app.services import ServiceError, toggle_bookmark
+
+    try:
+        article = toggle_bookmark(article_id)
+    except ServiceError as exc:
+        if request.args.get("ajax"):
+            return jsonify({"error": _t(exc.message_key)}), 404
+        flash(_t(exc.message_key))
+        return redirect(_local_redirect() or url_for("web.index"))
+
+    if request.args.get("ajax"):
+        return jsonify({"id": article.id, "bookmarked": bool(article.bookmarked)})
+    flash(_t("msg_bookmark_on") if article.bookmarked else _t("msg_bookmark_off"))
+    return redirect(_local_redirect() or url_for("web.index"))
+
+
+@web_bp.route("/bookmarks")
+def bookmarks():
+    """只看收藏。"""
+    page = request.args.get("page", 1, type=int) or 1
+    pagination = search_articles("", None, False, page=page, per_page=PER_PAGE, bookmarked_only=True)
+    return render_template(
+        "index.html",
+        **_context(
+            sources=Source.query.order_by(Source.id).all(),
+            articles=pagination,
+            search_bookmarked=True,
+        )
+    )
+
+
+@web_bp.route("/export/articles.<fmt>")
+def export_articles(fmt):
+    """导出文章：json / csv / markdown。"""
+    from flask import Response
+
+    from app import exporter
+
+    exporters = {
+        "json": (exporter.export_articles_json, "application/json; charset=utf-8"),
+        "csv": (exporter.export_articles_csv, "text/csv; charset=utf-8"),
+        "markdown": (exporter.export_articles_markdown, "text/markdown; charset=utf-8"),
+        "md": (exporter.export_articles_markdown, "text/markdown; charset=utf-8"),
+    }
+    if fmt not in exporters:
+        return "unsupported format", 404, {"Content-Type": "text/plain; charset=utf-8"}
+
+    func_, mimetype = exporters[fmt]
+    source_id = request.args.get("source_id", type=int)
+    unread_only = request.args.get("unread", "false").lower() == "true"
+    bookmarked_only = request.args.get("bookmarked", "false").lower() == "true"
+    payload = func_(source_id=source_id, unread_only=unread_only, bookmarked_only=bookmarked_only)
+
+    if fmt == "csv":
+        # 加 BOM，Excel 在中文 Windows 上打开才不会乱码
+        payload = "\ufeff" + payload
+    stamp = utcnow().strftime("%Y%m%d-%H%M%S")
+    return Response(
+        payload,
+        mimetype=mimetype,
+        headers={"Content-Disposition": f'attachment; filename="rss-articles-{stamp}.{fmt}"'},
     )
 
 
