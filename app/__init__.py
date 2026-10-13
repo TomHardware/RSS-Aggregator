@@ -1,16 +1,4 @@
-"""应用工厂。
 
-要点：
-1. 相对 SQLite 路径锚定到项目根目录（否则会被 Flask-SQLAlchemy 放进 instance
-   目录，容器里就落到未挂载的路径上，重启即丢数据）。
-2. 显式设置 SECRET_KEY：没有它 `flash()` 会抛
-   `RuntimeError: The session is unavailable because no secret key was set`。
-3. 日志只配置一次并支持绝对路径；`app.logger` 只透传，避免同一条日志输出两次。
-4. 调度器实例在 app/scheduler.py——同名子模块会把包属性 `app.scheduler`
-   覆盖成模块对象。
-5. v2.0.1：接入登录鉴权（未配置口令时自动关闭）、加固会话 Cookie、
-   限制请求体大小、对外暴露版本号。
-"""
 import logging
 import os
 import secrets
