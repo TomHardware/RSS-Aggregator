@@ -157,6 +157,13 @@ ENV/
 env.bak/
 venv.bak/
 
+# 本项目运行时产物
+data/
+*.db
+*.sqlite3
+rss_aggregator.log
+logs/
+
 # Spyder project settings
 .spyderproject
 .spyproject
