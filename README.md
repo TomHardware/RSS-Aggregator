@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**Current version: 2.0.5** &nbsp;·&nbsp; `/healthz` reports it too.
+**Current version: 2.0.6** &nbsp;·&nbsp; `/healthz` reports it too.
 
 A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML import/export, full-text extraction, search, email notifications, and a bilingual web interface. Ideal for personal or team use in information aggregation, content monitoring, and reading management.
 
@@ -27,12 +27,15 @@ A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML im
 - **Keyword Filtering & Full-Text Search**: Search across title, summary, and content, with optional filtering by source and unread status.
 - **Custom Update Frequency**: Each source can have its own fetch interval.
 - **Task visibility**: background fetches are tracked and exposed through `GET /api/status`; the web UI polls it every five seconds, shows what is being fetched and refreshes itself when a fetch finishes.
-- **Local desktop GUI**: `python desktop_gui.py` opens a native window (tkinter, bundled with Python) for managing feeds and reading articles; it starts the same web service in the background, so the browser works at the same time.
-- **Cross-platform**: tested paths for Windows, macOS and Linux — per-platform data directories, Windows high-DPI awareness and console encoding, and platform-correct default fonts.
+- **Cross-platform**: tested paths for Windows, macOS and Linux — per-platform data directories and Windows console encoding handling.
+- **Reading view**: a distraction-free page for each article with comfortable typography, a reading-progress bar, an estimated reading time and newer/older navigation.
+- **Keyboard shortcuts**: `j` / `k` move through the list, `o` opens, `s` bookmarks, `m` toggles read, `/` focuses search and `?` shows the cheat sheet.
+- **Category navigation**: one-click chips filter the list by feed category.
+- **Mark all as read**: clear the backlog in one action, or only for a single feed from the console.
+- **Instant feedback**: bookmark actions confirm with a toast instead of a page reload, and the unread count also appears in the tab title.
 - **Light and dark themes**: the web UI follows your system preference automatically and can be switched manually; the choice is remembered per browser.
-- **Bookmarks**: star any article and filter to bookmarked items only, from the web UI or the desktop window.
+- **Bookmarks**: star any article and filter to bookmarked items only, straight from the web interface.
 - **Data export**: download your articles as JSON (full backup), CSV (opens in Excel) or Markdown (reading archive).
-- **Desktop extras**: menu bar, instant search with debouncing, bookmark and read/unread actions from the right-click menu, and file-based export.
 - **Web console**: `/console` gives a compact dashboard with bulk actions (`Fetch all`, pause/resume, edit, delete) for when a browser is more convenient.
 - **Email Notifications**: Configure SMTP to receive email alerts when new articles are fetched.
 - **Docker Deployment**: Dockerfile and docker-compose.yaml provided for easy deployment.
@@ -71,10 +74,10 @@ rss_aggregator/
 │   ├── auth.py              # Single-user login, session and lockout
 │   ├── retention.py         # Article retention (per-feed count / age)
 │   ├── tasks.py             # In-memory background task registry for /api/status
-│   ├── services.py          # Shared operations used by the web UI, console and desktop GUI
+│   ├── services.py          # Shared operations used by the web UI and the console
+│   ├── reader.py            # Reading-view helpers (plain text, paragraphs, reading time)
 │   ├── exporter.py          # Article export: JSON / CSV / Markdown
 │   ├── platform_utils.py    # Windows / macOS / Linux differences in one place
-│   ├── gui.py               # Desktop GUI (tkinter, no extra dependency)
 │   ├── i18n.py              # English/Chinese translations
 │   ├── opml.py              # OPML import/export
 │   ├── fulltext.py          # Full-text extraction
@@ -99,7 +102,6 @@ rss_aggregator/
 │   ├── test_e2e_smoke.py      # End-to-end smoke test (starts a real server)
 │   └── test_debug_reloader.py # Verifies the scheduler starts only once under --debug
 ├── main.py                  # Web entry point
-├── desktop_gui.py           # Entry point for the local desktop GUI
 ├── config.yaml              # Configuration file
 ├── requirements.txt         # Python dependencies
 ├── Dockerfile               # Must stay at the build context root (compose uses `build: .`)

@@ -8,6 +8,63 @@
 
 ---
 
+## [2.0.6] - 2026-10-11
+
+界面增强版本：新增阅读视图与键盘操作等高级功能，重做网页排版，并移除本地桌面 GUI。
+Interface release: adds a reading view, keyboard operation and other advanced features, refines the web typography, and removes the local desktop GUI.
+
+### 重要变更 / Breaking change
+
+- **移除本地桌面 GUI**：不再提供 `desktop_gui.py` 与 `app/gui.py`，界面统一收敛到网页端，入口只有 `python main.py`。
+- *The local desktop GUI was removed: `desktop_gui.py` and `app/gui.py` are gone, the interface is now web-only and the single entry point is `python main.py`.*
+- 这样只需维护一套界面，跨平台差异也随之减少；原来桌面窗口里的操作在网页端都有对应入口。
+- *This leaves one interface to maintain and reduces cross-platform surface; everything the desktop window could do is available on the web.*
+
+### 新增功能 / Added
+
+- **阅读视图**：每篇文章都有独立的沉浸式阅读页，正文按长文阅读排版（行宽、行高、首字下沉）。
+- *Reading view: every article has its own distraction-free page with typography tuned for long-form reading (measure, line height, drop cap).*
+- 阅读页提供上一篇 / 下一篇导航，可一路读下去。
+- *The reading page offers newer and older navigation so you can keep reading in sequence.*
+- 阅读页顶部有滚动进度条，随时知道还剩多少内容。
+- *A scroll progress bar at the top of the reading page shows how much is left.*
+- 打开文章自动标记已读，也可以一键改回未读。
+- *Opening an article marks it read automatically, and it can be flipped back to unread in one click.*
+- 显示预估阅读时长，方便判断要不要现在读。
+- *An estimated reading time is shown, so you can decide whether to read it now.*
+- **键盘快捷键**：`j` / `k` 在文章间移动，`o` 打开，`s` 收藏，`m` 切换已读，`/` 聚焦搜索，`?` 显示快捷键表。
+- *Keyboard shortcuts: `j` / `k` move between articles, `o` opens, `s` bookmarks, `m` toggles read, `/` focuses search and `?` shows the cheat sheet.*
+- 列表中被选中的文章有明显描边，纯键盘操作也能看清当前位置。
+- *The focused article is clearly outlined, so keyboard-only navigation always shows where you are.*
+- **分类导航**：首页顶部按订阅源分类显示筛选按钮，并显示每个分类下的文章数。
+- *Category navigation: filter chips at the top of the home page show feed categories with their article counts.*
+- **全部标为已读**：一键清空积压，也可以在控制台里只针对某个源。
+- *Mark all as read: clear the backlog in one action, optionally for a single feed from the console.*
+- **即时反馈**：收藏等轻量操作用 Toast 提示，不再整页跳转。
+- *Instant feedback: lightweight actions such as bookmarking confirm with a toast instead of a page reload.*
+- **标签页未读数**：浏览器标签标题会带上未读数，切到别的标签也能看到有没有新内容。
+- *Unread count in the tab title, so you notice new items even while on another tab.*
+- **正文按段落渲染**：阅读页把 HTML 正文切成段落再排版，避免整块 HTML 直接塞进页面。
+- *Article bodies render as paragraphs: the reading page splits HTML into paragraphs instead of injecting a raw HTML block.*
+
+### 修复 / Fixed
+
+- **数据库文件与日志被提交进仓库**：`data/rss.db` 与 `rss_aggregator.log` 混进了版本库，会把本地数据泄露给所有使用者，已删除并加入忽略规则。
+- *The database file and log were committed: `data/rss.db` and `rss_aggregator.log` slipped into version control and would expose local data to everyone, so they were removed and ignored.*
+- **打包文件又一次缺失**：`.dockerignore` 仍未入库，`app/.dockerfile` 与 `app/web/__pycache__/` 又一次被提交。
+- *Packaging files were missing again: `.dockerignore` was still absent while `app/.dockerfile` and `app/web/__pycache__/` were committed once more.*
+- **新增路由的跳转参数缺失**：批量已读与收藏的跳转调用少了参数，会直接报 500，已修正。
+- *New routes passed too few arguments to the redirect helper, causing 500 errors on mark-all-read and bookmark actions; fixed.*
+- **分类过滤缺参数**：搜索函数新增了按分类过滤的能力，页面与导出都能用。
+- *The search function gained category filtering, usable from the list page and from export links.*
+
+### 兼容性 / Compatibility
+
+- 升级后数据库结构不变（收藏列已在 2.0.5 提供），无需迁移。
+- *The database schema is unchanged from 2.0.5 (the bookmark column already exists), so no migration is needed.*
+- 不再需要图形环境：删掉桌面 GUI 后，纯服务器部署也能用全部功能。
+- *No graphical environment is required any more: with the desktop GUI gone, a headless server runs everything.*
+
 ## [2.0.5] - 2026-10-11
 
 界面与跨平台版本：重做网页视觉与主题、新增收藏与导出等高级功能，并修复 5 项缺陷。

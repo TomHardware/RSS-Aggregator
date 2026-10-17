@@ -1,4 +1,17 @@
+"""RSS 抓取。
 
+修复要点：
+1. 失败分支必须 `db.session.rollback()`。原来出错直接 return，已 add 但未提交的
+   文章会留在 session 里，被之后任意一次 commit 悄悄写进数据库。
+2. 去重查询改为一次批量 SELECT。原来每个条目查一次，50 条就是 50 次查询。
+3. 全文抽取不再是「每个没有 content 的条目都同步抓一次网页」（最多 50 × 10s），
+   改为受 fulltext.enabled / max_per_fetch / timeout 控制，避免请求线程被拖死。
+4. 抓取前做 URL 安全校验（SSRF），默认拒绝内网/回环/链路本地地址；
+   并且**逐跳校验重定向**、限制响应体大小（见 app/urlsafety.safe_get）——
+   只校验首个地址时，一个公网 feed 用 302 就能把服务端引到内网。
+5. 并发写入撞上唯一约束时逐条降级重试，而不是让整批抓取失败。
+6. 通知邮件在事务提交之后发送，只列出真正入库的文章，且失败不影响抓取结果。
+"""
 import logging
 import time
 from datetime import datetime

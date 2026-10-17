@@ -307,3 +307,131 @@ footer.app-footer {
     header.app-header h1 { font-size: 17px; }
     th, td { padding: 6px 8px; }
 }
+
+/* ------------------------------------------------------------------ */
+/* v2.0.6：阅读视图、Toast 通知、快捷键提示与分类导航                    */
+/* ------------------------------------------------------------------ */
+
+/* 阅读视图：把正文排版放在首位（行宽、行高、字号都按长文阅读调） */
+article.reader {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 0 4px;
+}
+article.reader h1 {
+    font-size: clamp(24px, 3.4vw, 34px);
+    line-height: 1.25;
+    margin: 6px 0 10px;
+    letter-spacing: -.01em;
+}
+article.reader .reader-head .meta,
+article.reader .reader-foot .meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    color: var(--text-dim);
+    font-size: 13px;
+}
+article.reader .reader-body {
+    font-size: 17.5px;
+    line-height: 1.78;
+    color: var(--text);
+    margin: 24px 0;
+    overflow-wrap: break-word;
+}
+article.reader .reader-body p { margin: 0 0 1.15em; }
+article.reader .reader-body p:first-of-type::first-letter {
+    font-size: 2.4em;
+    float: left;
+    line-height: .9;
+    padding: 4px 8px 0 0;
+    color: var(--accent);
+    font-weight: 700;
+}
+article.reader .reader-body img { max-width: 100%; height: auto; border-radius: 8px; }
+article.reader .reader-body pre {
+    overflow-x: auto; padding: 12px; background: var(--surface-2);
+    border-radius: 8px; font-size: 14px;
+}
+article.reader .reader-body blockquote {
+    margin: 1em 0; padding: 4px 14px; border-left: 3px solid var(--border);
+    color: var(--text-dim);
+}
+article.reader .reader-foot {
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    margin-top: 24px;
+}
+
+/* 顶部阅读进度条（滚动位置） */
+.progress-bar {
+    position: sticky;
+    top: 0;
+    height: 3px;
+    background: var(--surface-2);
+    z-index: 20;
+    margin-bottom: 8px;
+}
+.progress-bar > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    transition: width .1s linear;
+}
+
+/* Toast：轻量操作反馈，不打断阅读 */
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translate(-50%, 16px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 9px 16px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+    z-index: 50;
+    max-width: 80vw;
+}
+.toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+/* 键盘键帽 */
+kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+/* 快捷键说明浮层 */
+.shortcut-help {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    max-width: 320px;
+    z-index: 60;
+}
+.shortcut-help p { margin: 6px 0; font-size: 13.5px; color: var(--text-dim); }
+
+/* 键盘光标所在的文章 */
+article.article.is-cursor {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+    border-radius: 6px;
+}
+
+/* 空状态 */
+.empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-dim);
+}

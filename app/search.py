@@ -9,10 +9,17 @@
 """
 from sqlalchemy import or_
 
-from app.models import Article
+from app.models import Article, Source
 
 MAX_PER_PAGE = 200
 LIKE_ESCAPE = "\\"
+
+
+def db_session():
+    """延迟导入：避免模块级循环引用。"""
+    from app import db
+
+    return db.session
 
 
 def _like_pattern(text):
@@ -26,8 +33,8 @@ def _like_pattern(text):
 
 
 def search_articles(query, source_id=None, unread_only=False, page=1, per_page=50,
-                    bookmarked_only=False):
-    """按标题/摘要/正文搜索，支持来源、未读与收藏过滤、分页。"""
+                    bookmarked_only=False, category=None):
+    """按标题/摘要/正文搜索，支持来源、分类、未读与收藏过滤、分页。"""
     q = Article.query
 
     if query and query.strip():
@@ -42,6 +49,14 @@ def search_articles(query, source_id=None, unread_only=False, page=1, per_page=5
 
     if source_id:
         q = q.filter(Article.source_id == source_id)
+
+    if category:
+        # 分类存在订阅源上，按源分类过滤文章
+        q = q.filter(
+            Article.source_id.in_(
+                db_session().query(Source.id).filter(Source.category == category)
+            )
+        )
 
     if unread_only:
         # read 为 NULL（历史数据或外部写入）并不是「已读」，

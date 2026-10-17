@@ -228,69 +228,6 @@ def test_console_requires_login_when_auth_enabled():
 # --------------------------------------------------------------------------- #
 # 3. 桌面 GUI
 # --------------------------------------------------------------------------- #
-@test
-def test_desktop_gui_files_exist():
-    """桌面 GUI 的入口与模块必须在仓库里。"""
-    for rel in ("desktop_gui.py", "app/gui.py", "app/services.py",
-                "app/web/templates/console.html"):
-        path = os.path.join(REPO, rel.replace("/", os.sep))
-        assert os.path.exists(path), f"缺少 {rel}"
-
-
-@test
-def test_desktop_gui_module_imports_without_display():
-    """只导入 GUI 模块不应创建窗口（服务器 / 无图形环境也能 import）。"""
-    import app.gui as gui
-
-    assert callable(gui.main)
-    assert callable(gui.start_server)
-    assert hasattr(gui, "DesktopApp")
-
-
-@test
-def test_desktop_gui_embedded_server_serves_healthz():
-    """窗口内嵌的 Web 服务要真的能起来并响应 /healthz。"""
-    import socket
-
-    from app.gui import start_server
-
-    env = make_env()
-    try:
-        app = env.app()
-        with socket.socket() as sock:
-            sock.bind(("127.0.0.1", 0))
-            port = sock.getsockname()[1]
-        server, thread = start_server(app, "127.0.0.1", port)
-        try:
-            deadline = time.time() + 10
-            last = None
-            while time.time() < deadline:
-                try:
-                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=2) as resp:
-                        last = resp.read().decode()
-                        break
-                except Exception as exc:  # noqa: BLE001
-                    last = exc
-                    time.sleep(0.2)
-            assert last and not isinstance(last, Exception), f"内置服务未就绪: {last}"
-            from app.version import __version__
-
-            assert __version__ in last, last
-        finally:
-            server.shutdown()
-            thread.join(timeout=5)
-    finally:
-        env.close()
-
-
-@test
-def test_desktop_gui_uses_shared_services():
-    """桌面 GUI 必须复用共享业务层，而不是自己再写一套数据库逻辑。"""
-    source = open(os.path.join(REPO, "app", "gui.py"), encoding="utf-8").read()
-    for name in ("add_feed", "edit_feed", "toggle_feed", "delete_feed", "mark_read", "fetch_all"):
-        assert name in source, f"app/gui.py 没有使用 services.{name}"
-
-
 # --------------------------------------------------------------------------- #
 # 4. 版本一致性
 # --------------------------------------------------------------------------- #

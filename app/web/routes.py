@@ -69,6 +69,30 @@ def _language():
     return request.args.get("lang") or current_app.config.get("APP_LANGUAGE", "en")
 
 
+def _categories():
+    """分类（取自订阅源）与该分类下的文章数，用于首页的分类导航。"""
+    try:
+        rows = (
+            db.session.query(Source.category, func.count(Article.id))
+            .outerjoin(Article, Article.source_id == Source.id)
+            .group_by(Source.category)
+            .order_by(Source.category)
+            .all()
+        )
+    except Exception as exc:  # noqa: BLE001 - 分类导航失败不应让页面 500
+        logger.warning("统计分类失败: %s", exc)
+        return []
+
+    class _Item:
+        __slots__ = ("name", "count")
+
+        def __init__(self, name, count):
+            self.name = name
+            self.count = count
+
+    return [_Item(name, count) for name, count in rows if name]
+
+
 def _page_url(page):
     """保留当前查询条件的分页链接。"""
     args = request.args.to_dict(flat=True)
@@ -120,6 +144,7 @@ def _context(**extra):
         "current_user": current_user(),
         "export_filters": export_filters,
         "article_count": Article.query.count(),
+        "categories": _categories(),
         "source_names": {source.id: (source.name or source.url) for source in Source.query.all()},
     }
     context.update(extra)
@@ -308,9 +333,11 @@ def search():
     source_id = request.args.get("source_id", type=int)
     unread = request.args.get("unread", "false").lower() == "true"
     bookmarked = request.args.get("bookmarked", "false").lower() == "true"
+    category = (request.args.get("category") or "").strip()
     page = request.args.get("page", 1, type=int) or 1
     pagination = search_articles(
-        query, source_id, unread, page=page, per_page=PER_PAGE, bookmarked_only=bookmarked
+        query, source_id, unread, page=page, per_page=PER_PAGE, bookmarked_only=bookmarked,
+        category=category,
     )
     return render_template(
         "index.html",
@@ -321,8 +348,69 @@ def search():
             search_source_id=source_id,
             search_unread=unread,
             search_bookmarked=bookmarked,
+            search_category=category,
         )
     )
+
+
+# --------------------------------------------------------------------------- #
+# 阅读视图与批量操作
+# --------------------------------------------------------------------------- #
+def _neighbours(article, window=300):
+    """在最近的文章里找出上一篇 / 下一篇文章 id。
+
+    只扫有限条数：个人阅读器的规模下足够，也避免为了两个链接做全表排序。
+    """
+    recent = (
+        Article.query.order_by(Article.published.desc(), Article.id.desc()).limit(window).all()
+    )
+    ids = [item.id for item in recent]
+    if article.id not in ids:
+        return None, None
+    index = ids.index(article.id)
+    newer = ids[index - 1] if index > 0 else None
+    older = ids[index + 1] if index + 1 < len(ids) else None
+    return newer, older
+
+
+@web_bp.route("/article/<int:article_id>")
+def article_detail(article_id):
+    """阅读视图：干净排版 + 上一篇/下一篇 + 快捷键。"""
+    article = db.session.get(Article, article_id)
+    if article is None:
+        return "article not found", 404, {"Content-Type": "text/plain; charset=utf-8"}
+    source = db.session.get(Source, article.source_id) if article.source_id else None
+    newer, older = _neighbours(article)
+    body = article.content or article.summary or ""
+    from app.reader import paragraphs, reading_minutes
+
+    return render_template(
+        "reader.html",
+        **_context(
+            article=article,
+            source=source,
+            body=body,
+            paragraphs=paragraphs(body),
+            newer_id=newer,
+            older_id=older,
+            minutes=reading_minutes(body),
+        )
+    )
+
+
+@web_bp.route("/mark_all_read", methods=["POST"])
+def mark_all_read():
+    """把未读文章一次标为已读；带 source_id 时只处理该源。"""
+    source_id = request.form.get("source_id", type=int) or request.args.get("source_id", type=int)
+    query = Article.query.filter(or_(Article.read.is_(False), Article.read.is_(None)))
+    if source_id:
+        query = query.filter(Article.source_id == source_id)
+    updated = query.update({Article.read: True}, synchronize_session=False)
+    db.session.commit()
+    flash(_t("msg_marked_all_read", count=updated))
+    logger.info("批量标记已读：%d 篇（source=%s）", updated, source_id or "全部")
+    target = request.form.get("next") or request.referrer or url_for("web.index")
+    return redirect(_local_redirect(target, url_for("web.index")))
 
 
 # --------------------------------------------------------------------------- #
@@ -339,12 +427,12 @@ def bookmark_article(article_id):
         if request.args.get("ajax"):
             return jsonify({"error": _t(exc.message_key)}), 404
         flash(_t(exc.message_key))
-        return redirect(_local_redirect() or url_for("web.index"))
+        return redirect(_local_redirect(request.referrer or url_for("web.index"), url_for("web.index")))
 
     if request.args.get("ajax"):
         return jsonify({"id": article.id, "bookmarked": bool(article.bookmarked)})
     flash(_t("msg_bookmark_on") if article.bookmarked else _t("msg_bookmark_off"))
-    return redirect(_local_redirect() or url_for("web.index"))
+    return redirect(_local_redirect(request.referrer or url_for("web.index"), url_for("web.index")))
 
 
 @web_bp.route("/bookmarks")

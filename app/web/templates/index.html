@@ -75,7 +75,22 @@
                 <a class="btn" href="{{ url_for('web.export_articles', fmt='csv', **export_filters) }}">CSV</a>
                 <a class="btn" href="{{ url_for('web.export_articles', fmt='markdown', **export_filters) }}">Markdown</a>
                 <a class="btn" href="{{ url_for('web.export_opml_route') }}">OPML</a>
+                <span class="spacer" style="flex:1"></span>
+                <form action="{{ url_for('web.mark_all_read') }}" method="post" style="display:inline">
+                    <button type="submit" class="btn">{{ _('mark_all_read') }}</button>
+                </form>
             </div>
+            {% if categories %}
+            <div class="row" style="margin-top:10px">
+                <span class="pill">{{ _('category') }}</span>
+                <a class="btn {% if not search_category %}btn-primary{% endif %}"
+                   href="{{ url_for('web.search', **dict(request.args.to_dict(), category=None)) }}">{{ _('all_categories') }}</a>
+                {% for item in categories %}
+                    <a class="btn {% if search_category == item.name %}btn-primary{% endif %}"
+                       href="{{ url_for('web.search', category=item.name) }}">{{ item.name }} <span class="pill">{{ item.count }}</span></a>
+                {% endfor %}
+            </div>
+            {% endif %}
         </section>
 
         <!-- 添加订阅源 -->
@@ -161,7 +176,12 @@
                 {% if articles.items %}
                     {% for article in articles.items %}
                     <article class="article {% if article.read %}is-read{% endif %}" id="article-{{ article.id }}">
-                        <h3><a href="{{ article.link }}" target="_blank" rel="noopener noreferrer">{{ article.title }}</a></h3>
+                        <h3>
+                            <a href="{{ url_for('web.article_detail', article_id=article.id) }}">{{ article.title }}</a>
+                            <a href="{{ article.link }}" target="_blank" rel="noopener noreferrer"
+                               title="{{ _('open_original') }}" aria-label="{{ _('open_original') }}"
+                               style="font-size:13px;color:var(--text-dim)">↗</a>
+                        </h3>
                         <div class="meta">
                             <span>{{ source_names.get(article.source_id, '') }}</span>
                             <span>{{ article.published or '' }}</span>
@@ -194,11 +214,76 @@
         </div>
     </main>
 
+    <div id="shortcut-help" class="card shortcut-help" hidden>
+        <h2>{{ _('shortcuts') }}</h2>
+        <p><kbd>j</kbd> / <kbd>k</kbd> {{ _('shortcut_next_prev') }}</p>
+        <p><kbd>o</kbd> {{ _('shortcut_open') }} · <kbd>s</kbd> {{ _('mark_bookmark') }} · <kbd>m</kbd> {{ _('mark_read') }}</p>
+        <p><kbd>/</kbd> {{ _('shortcut_search') }} · <kbd>?</kbd> {{ _('shortcuts') }}</p>
+    </div>
+
     <footer class="app-footer">
         {{ app_name }} {{ app_version }}
     </footer>
 
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
     <script>
+    // 键盘快捷键（无障碍的多模态交互：鼠标、键盘都能完成常用操作）
+    (function () {
+        const articles = Array.from(document.querySelectorAll('article.article'));
+        let cursor = -1;
+
+        function focusArticle(index) {
+            if (!articles.length) return;
+            cursor = Math.max(0, Math.min(articles.length - 1, index));
+            articles.forEach(item => item.classList.remove('is-cursor'));
+            const target = articles[cursor];
+            target.classList.add('is-cursor');
+            target.scrollIntoView({block: 'center', behavior: 'smooth'});
+        }
+
+        function current() {
+            return cursor >= 0 ? articles[cursor] : null;
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.target.matches('input, textarea, select')) return;
+            const key = event.key;
+            if (key === 'j') { focusArticle(cursor + 1); }
+            else if (key === 'k') { focusArticle(cursor - 1); }
+            else if (key === 'o' && current()) {
+                const link = current().querySelector('h3 a');
+                if (link) window.location = link.href;
+            }
+            else if (key === 's' && current()) {
+                const star = current().querySelector('.bookmark-toggle');
+                if (star) star.click();
+            }
+            else if (key === 'm' && current()) {
+                const form = current().querySelector('form[action*="/read"]');
+                if (form) form.submit();
+            }
+            else if (key === '/') {
+                event.preventDefault();
+                const search = document.querySelector('input[type=search]');
+                if (search) search.focus();
+            }
+            else if (key === '?') {
+                const help = document.getElementById('shortcut-help');
+                if (help) help.hidden = !help.hidden;
+            }
+        });
+    })();
+
+    // Toast：收藏等轻量操作给出即时反馈，不打断当前页面
+    function notify(text) {
+        const toast = document.getElementById('toast');
+        if (!toast) return;
+        toast.textContent = text;
+        toast.classList.add('is-visible');
+        setTimeout(function () { toast.classList.remove('is-visible'); }, 1800);
+    }
+
     // 任务状态轮询：显示抓取进展，抓取结束后自动刷新页面。
     (function () {
         const box = document.getElementById('task-status');
@@ -260,6 +345,12 @@
                     if (bar) bar.hidden = true;
                     box.textContent = recent.length ? label(recent[0]) : '';
                 }
+
+                // 未读数同步到标签页标题：切到别的标签也能看到有没有新内容
+                if (typeof data.unread_total === 'number') {
+                    const base = document.title.replace(/^\(\d+\+\)\s*/, '');
+                    document.title = data.unread_total ? `(${data.unread_total}) ${base}` : base;
+                }
             } catch (err) {
                 /* 网络抖动忽略 */
             }
@@ -286,6 +377,7 @@
             const data = await resp.json();
             button.textContent = data.bookmarked ? '★' : '☆';
             button.setAttribute('aria-pressed', data.bookmarked ? 'true' : 'false');
+            notify(data.bookmarked ? '{{ _("msg_bookmark_on") }}' : '{{ _("msg_bookmark_off") }}');
         } catch (err) {
             button.textContent = wasOn ? '★' : '☆';
         } finally {
