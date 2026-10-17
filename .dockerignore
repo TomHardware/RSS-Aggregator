@@ -1,0 +1,23 @@
+.git
+.gitignore
+.github
+.venv
+venv
+env
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+
+# 本地数据与日志不要打进镜像
+data
+*.db
+*.sqlite3
+*.log
+logs
+instance
+
+# 测试随仓库分发（本地跑），但不必进镜像
+tests
+tests/
