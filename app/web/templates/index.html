@@ -176,8 +176,14 @@
                 {% if articles.items %}
                     {% for article in articles.items %}
                     <article class="article {% if article.read %}is-read{% endif %}" id="article-{{ article.id }}">
+                        {% set image = thumb(article) %}
+                        {% if image %}
+                            <img class="thumb" src="{{ image }}" alt="" loading="lazy" decoding="async"
+                                 referrerpolicy="no-referrer"
+                                 onerror="this.remove()">
+                        {% endif %}
                         <h3>
-                            <a href="{{ url_for('web.article_detail', article_id=article.id) }}">{{ article.title }}</a>
+                            <a href="{{ url_for('web.article_detail', article_id=article.id) }}">{{ hl(article.title)|safe }}</a>
                             <a href="{{ article.link }}" target="_blank" rel="noopener noreferrer"
                                title="{{ _('open_original') }}" aria-label="{{ _('open_original') }}"
                                style="font-size:13px;color:var(--text-dim)">↗</a>
@@ -196,7 +202,7 @@
                                 <button type="submit" class="btn btn-icon">{{ _('mark_unread') if article.read else _('mark_read') }}</button>
                             </form>
                         </div>
-                        {% if article.summary %}<p class="summary">{{ article.summary[:300] }}{% if article.summary|length > 300 %}…{% endif %}</p>{% endif %}
+                        {% if article.summary %}<p class="summary">{{ hl(article.summary[:300])|safe }}{% if article.summary|length > 300 %}…{% endif %}</p>{% endif %}
                     </article>
                     {% endfor %}
 
@@ -208,7 +214,7 @@
                     </nav>
                     {% endif %}
                 {% else %}
-                    <p>{{ _('no_articles') }}</p>
+                    <p class="empty"><span class="glyph">🗒️</span>{{ _('no_articles') }}</p>
                 {% endif %}
             </section>
         </div>
@@ -219,6 +225,7 @@
         <p><kbd>j</kbd> / <kbd>k</kbd> {{ _('shortcut_next_prev') }}</p>
         <p><kbd>o</kbd> {{ _('shortcut_open') }} · <kbd>s</kbd> {{ _('mark_bookmark') }} · <kbd>m</kbd> {{ _('mark_read') }}</p>
         <p><kbd>/</kbd> {{ _('shortcut_search') }} · <kbd>?</kbd> {{ _('shortcuts') }}</p>
+        <p><kbd>Ctrl</kbd> + <kbd>k</kbd> {{ _('shortcut_palette') }}</p>
     </div>
 
     <footer class="app-footer">
@@ -226,6 +233,16 @@
     </footer>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <!-- 命令面板（Ctrl+K）：键盘优先的快速跳转 -->
+    <div id="palette-mask" class="palette-mask" hidden>
+        <div class="palette" role="dialog" aria-modal="true" aria-label="{{ _('command_palette') }}">
+            <input type="text" id="palette-input" placeholder="{{ _('palette_placeholder') }}"
+                   autocomplete="off" spellcheck="false" aria-controls="palette-list">
+            <ul id="palette-list" role="listbox"></ul>
+            <div style="padding:8px 14px;color:var(--text-dim);font-size:12px">{{ _('palette_hint') }}</div>
+        </div>
+    </div>
 
     <script>
     // 键盘快捷键（无障碍的多模态交互：鼠标、键盘都能完成常用操作）
@@ -275,6 +292,104 @@
         });
     })();
 
+    // 命令面板：Ctrl/Cmd+K 唤起，输入即筛选，回车跳转
+    (function () {
+        const mask = document.getElementById('palette-mask');
+        const input = document.getElementById('palette-input');
+        const list = document.getElementById('palette-list');
+        if (!mask || !input || !list) return;
+
+        const items = [];
+        items.push({label: '{{ _("console_home") }}', hint: '{{ _("palette_pages") }}', href: '{{ url_for("web.index") }}'});
+        items.push({label: '{{ _("console_title") }}', hint: '{{ _("palette_pages") }}', href: '{{ url_for("web.console") }}'});
+        items.push({label: '{{ _("stats_title") }}', hint: '{{ _("palette_pages") }}', href: '{{ url_for("web.stats_page") }}'});
+        items.push({label: '{{ _("bookmarks") }}', hint: '{{ _("palette_pages") }}', href: '{{ url_for("web.bookmarks") }}'});
+        {% for article in articles.items %}
+        items.push({
+            label: {{ article.title|tojson }},
+            hint: '{{ _("palette_articles") }}',
+            href: '{{ url_for("web.article_detail", article_id=article.id) }}'
+        });
+        {% endfor %}
+        {% for source in sources %}
+        items.push({
+            label: {{ source.name|tojson }},
+            hint: '{{ _("sources") }}',
+            href: '{{ url_for("web.search", source_id=source.id) }}'
+        });
+        {% endfor %}
+
+        let matches = items.slice(0, 12);
+        let active = 0;
+
+        function render() {
+            list.innerHTML = '';
+            if (!matches.length) {
+                const li = document.createElement('li');
+                li.textContent = '{{ _("palette_no_match") }}';
+                li.setAttribute('aria-disabled', 'true');
+                list.appendChild(li);
+                return;
+            }
+            matches.forEach(function (item, index) {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.setAttribute('aria-selected', index === active ? 'true' : 'false');
+                li.textContent = item.label;
+                const hint = document.createElement('span');
+                hint.className = 'hint';
+                hint.textContent = item.hint;
+                li.appendChild(hint);
+                li.addEventListener('click', function () { window.location = item.href; });
+                list.appendChild(li);
+            });
+        }
+
+        function filter() {
+            const query = input.value.trim().toLowerCase();
+            matches = (query
+                ? items.filter(function (item) { return item.label.toLowerCase().includes(query); })
+                : items).slice(0, 30);
+            active = 0;
+            render();
+        }
+
+        function open() {
+            mask.hidden = false;
+            input.value = '';
+            filter();
+            input.focus();
+        }
+
+        function close() { mask.hidden = true; }
+
+        document.addEventListener('keydown', function (event) {
+            const isOpen = !mask.hidden;
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                isOpen ? close() : open();
+                return;
+            }
+            if (!isOpen) return;
+            if (event.key === 'Escape') { close(); }
+            else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                active = Math.min(active + 1, matches.length - 1);
+                render();
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                active = Math.max(active - 1, 0);
+                render();
+            } else if (event.key === 'Enter' && matches[active]) {
+                window.location = matches[active].href;
+            }
+        });
+
+        input.addEventListener('input', filter);
+        mask.addEventListener('click', function (event) {
+            if (event.target === mask) close();
+        });
+    })();
     // Toast：收藏等轻量操作给出即时反馈，不打断当前页面
     function notify(text) {
         const toast = document.getElementById('toast');

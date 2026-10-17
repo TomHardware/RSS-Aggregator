@@ -435,3 +435,228 @@ article.article.is-cursor {
     text-align: center;
     color: var(--text-dim);
 }
+
+/* ================================================================== */
+/* v2.0.7：视觉升级（参考 DeepSeek 官网的克制风格）                      */
+/* 要点：大面积留白 + 极轻的渐变光晕 + 玻璃质感页头 + 极短的过渡时间      */
+/* 所有动效都受 prefers-reduced-motion 约束                             */
+/* ================================================================== */
+
+:root {
+    --glow-1: rgba(37, 99, 235, .14);
+    --glow-2: rgba(139, 92, 246, .12);
+    --glass: rgba(255, 255, 255, .72);
+    --lift: 0 10px 30px rgba(16, 24, 40, .10), 0 2px 6px rgba(16, 24, 40, .05);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --glow-1: rgba(96, 165, 250, .18);
+        --glow-2: rgba(167, 139, 250, .14);
+        --glass: rgba(28, 32, 36, .72);
+        --lift: 0 10px 30px rgba(0, 0, 0, .55);
+    }
+}
+
+html[data-theme="light"] { --glass: rgba(255, 255, 255, .72); }
+html[data-theme="dark"]  { --glass: rgba(28, 32, 36, .72); }
+
+/* 背景光晕：固定定位，不随滚动移动，避免视差带来的廉价感 */
+body::before {
+    content: "";
+    position: fixed;
+    inset: -20% -10% auto -10%;
+    height: 60vh;
+    background:
+        radial-gradient(45% 55% at 22% 0%, var(--glow-1) 0%, transparent 70%),
+        radial-gradient(40% 50% at 78% 8%, var(--glow-2) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* 页头：半透明玻璃 + 轻微模糊，滚动时保持可用 */
+header.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    transition: box-shadow .2s ease, transform .2s ease;
+}
+header.app-header h1 {
+    letter-spacing: -.015em;
+    background: linear-gradient(92deg, var(--text) 0%, var(--text) 55%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* 卡片：悬停轻微上浮 + 阴影加深，替代边框加粗的廉价做法 */
+.card {
+    border-radius: 14px;
+    transition: box-shadow .22s ease, transform .22s ease, border-color .22s ease;
+}
+.card:hover { box-shadow: var(--lift); border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); }
+
+/* 按钮：过渡更短，按压有回弹感 */
+.btn, button { transition: background .16s ease, border-color .16s ease, transform .12s ease, box-shadow .16s ease; }
+.btn:active, button:active { transform: translateY(1px) scale(.995); }
+
+/* 文章条目：hover 时左侧出现一条强调色，视觉上更容易定位 */
+article.article {
+    position: relative;
+    padding-left: 14px;
+    transition: background .18s ease;
+}
+article.article::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 10px; bottom: 10px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+article.article:hover::before,
+article.article.is-cursor::before { opacity: 1; }
+
+/* 关键词高亮 */
+mark.hl {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: inherit;
+    padding: 0 2px;
+    border-radius: 3px;
+}
+
+/* 缩略图：文章列表里的视觉锚点 */
+.thumb {
+    float: right;
+    width: 104px;
+    height: 72px;
+    margin: 0 0 8px 12px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+}
+
+/* 骨架屏：抓取进行中显示占位，避免纯文字等待 */
+.skeleton {
+    height: 14px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 37%, var(--surface-2) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+}
+.skeleton + .skeleton { margin-top: 8px; }
+@keyframes shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none; background: var(--surface-2); }
+}
+
+/* 命令面板（Ctrl+K）：居中浮层 + 毛玻璃遮罩 */
+.palette-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 12, 16, .38);
+    backdrop-filter: blur(3px);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 14vh;
+    z-index: 100;
+}
+.palette {
+    width: min(620px, 92vw);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .28);
+    overflow: hidden;
+}
+.palette input {
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 14px 18px;
+    font-size: 16px;
+    background: transparent;
+    color: var(--text);
+}
+.palette ul { list-style: none; margin: 0; padding: 6px; max-height: 46vh; overflow-y: auto; }
+.palette li {
+    padding: 9px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+}
+.palette li[aria-selected="true"], .palette li:hover { background: var(--surface-2); }
+.palette li .hint { margin-left: auto; font-size: 12px; color: var(--text-dim); }
+
+/* 统计页：纯 CSS 柱状图 */
+.chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 160px;
+    padding-top: 8px;
+}
+.chart .bar {
+    flex: 1;
+    min-height: 2px;
+    background: linear-gradient(180deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 55%, transparent) 100%);
+    border-radius: 6px 6px 2px 2px;
+    position: relative;
+    transition: filter .16s ease;
+}
+.chart .bar:hover { filter: brightness(1.12); }
+.chart .bar span {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10.5px;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+.chart-wrap { padding-bottom: 22px; overflow-x: auto; }
+
+/* 数字卡片 */
+.stat-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+}
+.stat-card .k { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); }
+.stat-card .v { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin-top: 4px; }
+
+/* 进度条（阅读比例） */
+.meter { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.meter > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+/* 滚动条与选区配色，细节上更像现代站点 */
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+
+/* 空状态：给一个图形化的占位，而不是干巴巴一行字 */
+.empty {
+    padding: 36px 16px;
+    text-align: center;
+    color: var(--text-dim);
+}
+.empty .glyph { font-size: 30px; opacity: .5; display: block; margin-bottom: 8px; }

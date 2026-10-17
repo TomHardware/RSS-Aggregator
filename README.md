@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**Current version: 2.0.6** &nbsp;·&nbsp; `/healthz` reports it too.
+**Current version: 2.0.7** &nbsp;·&nbsp; `/healthz` reports it too.
 
 A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML import/export, full-text extraction, search, email notifications, and a bilingual web interface. Ideal for personal or team use in information aggregation, content monitoring, and reading management.
 
@@ -33,6 +33,11 @@ A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML im
 - **Category navigation**: one-click chips filter the list by feed category.
 - **Mark all as read**: clear the backlog in one action, or only for a single feed from the console.
 - **Instant feedback**: bookmark actions confirm with a toast instead of a page reload, and the unread count also appears in the tab title.
+- **Search highlighting**: matched keywords are marked in titles and summaries; the text is escaped first, so feed content cannot inject markup.
+- **Article thumbnails**: the first image in an article is shown as a lazy-loaded thumbnail, giving the list a visual anchor.
+- **Statistics page**: `/stats` shows totals, a 14-day activity chart drawn with pure CSS, and a per-feed read-ratio breakdown.
+- **Command palette**: press `Ctrl`/`Cmd` + `K` to jump to any article, feed or page with the keyboard.
+- **Refined visual design**: soft gradient glow, a frosted sticky header, card hover lift and skeleton placeholders while fetching.
 - **Light and dark themes**: the web UI follows your system preference automatically and can be switched manually; the choice is remembered per browser.
 - **Bookmarks**: star any article and filter to bookmarked items only, straight from the web interface.
 - **Data export**: download your articles as JSON (full backup), CSV (opens in Excel) or Markdown (reading archive).
@@ -76,6 +81,8 @@ rss_aggregator/
 │   ├── tasks.py             # In-memory background task registry for /api/status
 │   ├── services.py          # Shared operations used by the web UI and the console
 │   ├── reader.py            # Reading-view helpers (plain text, paragraphs, reading time)
+│   ├── highlight.py         # Safe search-term highlighting
+│   ├── stats.py             # Aggregates for the statistics page
 │   ├── exporter.py          # Article export: JSON / CSV / Markdown
 │   ├── platform_utils.py    # Windows / macOS / Linux differences in one place
 │   ├── i18n.py              # English/Chinese translations
@@ -99,6 +106,8 @@ rss_aggregator/
 │   ├── test_v202_bugs.py      # v2.0.2 task API, polling and fixes (14 cases)
 │   ├── test_v204_bugs.py      # v2.0.4 GUI and console checks (14 cases)
 │   ├── test_v205_bugs.py      # v2.0.5 UI, bookmarks, export and platform checks
+│   ├── test_v206_bugs.py      # v2.0.6 reading view and GUI removal checks
+│   ├── test_v207_bugs.py      # v2.0.7 highlight, thumbnails, stats and visual checks
 │   ├── test_e2e_smoke.py      # End-to-end smoke test (starts a real server)
 │   └── test_debug_reloader.py # Verifies the scheduler starts only once under --debug
 ├── main.py                  # Web entry point

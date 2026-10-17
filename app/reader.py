@@ -35,6 +35,24 @@ def paragraphs(raw):
     return [block for block in blocks if block]
 
 
+IMG_RE = re.compile(r"<img[^>]+src=[\"\']([^\"\']+)[\"\']", re.IGNORECASE)
+
+
+def first_image(raw, max_len=2000):
+    """取正文里的第一张图片地址；只接受 http(s) 或站内相对路径。"""
+    if not raw:
+        return None
+    match = IMG_RE.search(raw)
+    if not match:
+        return None
+    src = match.group(1).strip()
+    if len(src) > max_len:
+        return None
+    if src.startswith(("http://", "https://")):
+        return src
+    return None
+
+
 def reading_minutes(raw):
     """估算阅读时长，最少 1 分钟。"""
     length = len(plain_text(raw))

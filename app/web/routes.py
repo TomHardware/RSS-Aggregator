@@ -69,6 +69,28 @@ def _language():
     return request.args.get("lang") or current_app.config.get("APP_LANGUAGE", "en")
 
 
+def _highlight_helper():
+    """模板里的高亮函数：把搜索词在标题/摘要里标出来（已转义，安全）。"""
+    from app.highlight import highlight, split_terms
+
+    terms = split_terms(request.args.get("q", ""))
+
+    def _hl(text):
+        return highlight(text, terms)
+
+    return _hl
+
+
+def _thumbnail_helper():
+    """从正文/摘要里取第一张图片作为缩略图（多模态：让列表有视觉锚点）。"""
+    from app.reader import first_image
+
+    def _thumb(article):
+        return first_image(article.content) or first_image(article.summary)
+
+    return _thumb
+
+
 def _categories():
     """分类（取自订阅源）与该分类下的文章数，用于首页的分类导航。"""
     try:
@@ -129,6 +151,8 @@ def _context(**extra):
         export_filters["unread"] = "true"
     if request.args.get("bookmarked", "").lower() == "true":
         export_filters["bookmarked"] = "true"
+    if (request.args.get("category") or "").strip():
+        export_filters["category"] = request.args.get("category").strip()
 
     context = {
         "lang": lang,
@@ -145,6 +169,8 @@ def _context(**extra):
         "export_filters": export_filters,
         "article_count": Article.query.count(),
         "categories": _categories(),
+        "hl": _highlight_helper(),
+        "thumb": _thumbnail_helper(),
         "source_names": {source.id: (source.name or source.url) for source in Source.query.all()},
     }
     context.update(extra)
@@ -470,7 +496,10 @@ def export_articles(fmt):
     source_id = request.args.get("source_id", type=int)
     unread_only = request.args.get("unread", "false").lower() == "true"
     bookmarked_only = request.args.get("bookmarked", "false").lower() == "true"
-    payload = func_(source_id=source_id, unread_only=unread_only, bookmarked_only=bookmarked_only)
+    payload = func_(
+        source_id=source_id, unread_only=unread_only, bookmarked_only=bookmarked_only,
+        category=(request.args.get("category") or "").strip() or None,
+    )
 
     if fmt == "csv":
         # 加 BOM，Excel 在中文 Windows 上打开才不会乱码
@@ -480,6 +509,21 @@ def export_articles(fmt):
         payload,
         mimetype=mimetype,
         headers={"Content-Disposition": f'attachment; filename="rss-articles-{stamp}.{fmt}"'},
+    )
+
+
+@web_bp.route("/stats")
+def stats_page():
+    """统计页：总量、按日趋势、按源分布。"""
+    from app import stats
+
+    return render_template(
+        "stats.html",
+        **_context(
+            overview=stats.overview(),
+            daily=stats.daily_counts(),
+            sources=stats.source_breakdown(),
+        )
     )
 
 

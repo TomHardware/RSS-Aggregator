@@ -8,6 +8,60 @@
 
 ---
 
+## [2.0.7] - 2026-10-17
+
+视觉与数据洞察版本：网页视觉按现代站点风格重做，新增统计页、搜索高亮、文章缩略图与命令面板。
+Visual and insight release: the web interface was restyled in a modern idiom, adding a statistics page, search highlighting, article thumbnails and a command palette.
+
+### 新增功能 / Added
+
+- **统计页**：`/stats` 展示文章总数、未读数、收藏数、订阅源数量与整体已读比例。
+- *Statistics page: `/stats` shows total articles, unread, bookmarks, feed counts and the overall read ratio.*
+- 最近 14 天的新增趋势用柱状图呈现，纯 CSS 绘制，不依赖任何图表库或 CDN。
+- *The last 14 days of activity render as a bar chart drawn in pure CSS, with no chart library or CDN.*
+- 按订阅源分列文章总数、未读数与已读比例条，一眼看出哪些源在积压。
+- *A per-feed table lists totals, unread counts and read-ratio meters, so it is obvious which feeds are piling up.*
+- **搜索关键词高亮**：命中的词在标题与摘要里标出来，快速定位为什么这条被搜到。
+- *Search highlighting marks matched terms in titles and summaries, so it is obvious why an item matched.*
+- 高亮由服务端生成且**先转义再标记**，feed 内容无法借此注入标记。
+- *Highlighting is produced server-side and **escapes before marking**, so feed content cannot inject markup.*
+- 支持多关键词同时高亮，并限制单条的最大标记数量避免页面被切碎。
+- *Multiple terms are highlighted at once, with a cap on marks per item so the page is not shredded.*
+- **文章缩略图**：自动提取正文里的第一张图片，作为列表中的视觉锚点。
+- *Article thumbnails: the first image in the body is extracted automatically as a visual anchor in the list.*
+- 缩略图懒加载并限制尺寸，加载失败自动隐藏，不会撑破排版。
+- *Thumbnails lazy-load, stay size-capped and hide themselves on error, so they cannot break the layout.*
+- **命令面板**：`Ctrl`/`Cmd` + `K` 唤起，输入即筛选，方向键选择，回车跳转。
+- *Command palette: `Ctrl`/`Cmd` + `K` opens it, typing filters, arrow keys navigate and Enter jumps.*
+- 面板里包含页面入口、当前列表的文章与所有订阅源，纯键盘即可完成跳转。
+- *It contains page entries, the articles currently listed and all feeds, so navigation is fully keyboard-driven.*
+- **视觉重做**：页面顶部加入柔和渐变光晕，页头改为毛玻璃吸顶，滚动时始终可用。
+- *Visual refresh: a soft gradient glow at the top, and a frosted sticky header that stays available while scrolling.*
+- 卡片悬停轻微上浮并加深阴影，文章条目左侧出现强调色，替代粗边框的廉价感。
+- *Cards lift slightly with a deeper shadow on hover and articles get an accent bar on the left, replacing heavy borders.*
+- 抓取进行中显示骨架屏占位，等待时不再是空白。
+- *Skeleton placeholders appear while a fetch is running, so waiting is no longer a blank screen.*
+- 空状态加上图形化占位，不再是干巴巴一行字。
+- *Empty states get an illustrated glyph instead of a bare line of text.*
+- 所有动效都尊重系统的「减少动态效果」设置，滚动条与选区也做了配色。
+- *Every animation respects the system reduce-motion setting, and scrollbars and text selection were themed too.*
+
+### 修复 / Fixed
+
+- **导出忽略分类筛选**：按分类浏览时点导出，导出的仍是全部文章；现在分类会带进导出参数与查询。
+- *Export ignored the category filter: exporting while browsing a category produced all articles; the category now flows into both the link and the query.*
+- **按源统计的未读数算错**：用了不存在的聚合写法，静默退化后未读数恒等于总数；已修正为正确的条件求和。
+- *Per-feed unread counts were wrong: an unsupported aggregate silently degraded so unread always equalled the total; it now uses a correct conditional sum.*
+
+### 兼容性 / Compatibility
+
+- 数据库结构不变，无需迁移。
+- *The database schema is unchanged, so no migration is needed.*
+- 未引入任何第三方依赖：柱状图、缩略图与命令面板都是原生实现。
+- *No third-party dependency was added: the chart, thumbnails and palette are all hand-rolled.*
+- 所有新增页面对登录鉴权、深色主题与窄屏都已适配。
+- *Every new page works with authentication, the dark theme and narrow screens.*
+
 ## [2.0.6] - 2026-10-11
 
 界面增强版本：新增阅读视图与键盘操作等高级功能，重做网页排版，并移除本地桌面 GUI。

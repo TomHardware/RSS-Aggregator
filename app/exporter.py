@@ -10,6 +10,7 @@ import io
 import json
 import logging
 
+from app import db
 from app.models import Article, Source, utcnow
 from app.version import __version__
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 MAX_EXPORT_ROWS = 20000  # 单次导出的上限，避免超大库把内存吃满
 
 
-def _query(source_id=None, unread_only=False, bookmarked_only=False):
+def _query(source_id=None, unread_only=False, bookmarked_only=False, category=None):
     query = Article.query
     if source_id:
         query = query.filter(Article.source_id == source_id)
@@ -28,12 +29,16 @@ def _query(source_id=None, unread_only=False, bookmarked_only=False):
         query = query.filter(or_(Article.read.is_(False), Article.read.is_(None)))
     if bookmarked_only:
         query = query.filter(Article.bookmarked.is_(True))
+    if category:
+        query = query.filter(
+            Article.source_id.in_(db.session.query(Source.id).filter(Source.category == category))
+        )
     return query.order_by(Article.published.desc(), Article.id.desc()).limit(MAX_EXPORT_ROWS)
 
 
-def export_articles_json(source_id=None, unread_only=False, bookmarked_only=False):
+def export_articles_json(source_id=None, unread_only=False, bookmarked_only=False, category=None):
     """完整备份：版本、导出时间、订阅源与文章。"""
-    rows = _query(source_id, unread_only, bookmarked_only).all()
+    rows = _query(source_id, unread_only, bookmarked_only, category).all()
     sources = {source.id: source for source in Source.query.all()}
     payload = {
         "generator": "RSS-Aggregator",
@@ -70,12 +75,12 @@ def export_articles_json(source_id=None, unread_only=False, bookmarked_only=Fals
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
-def export_articles_csv(source_id=None, unread_only=False, bookmarked_only=False):
+def export_articles_csv(source_id=None, unread_only=False, bookmarked_only=False, category=None):
     """CSV：Excel / Numbers / LibreOffice 都能直接打开。
 
     写 UTF-8 BOM：否则 Excel 在中文 Windows 上会把中文显示成乱码。
     """
-    rows = _query(source_id, unread_only, bookmarked_only).all()
+    rows = _query(source_id, unread_only, bookmarked_only, category).all()
     sources = {source.id: source for source in Source.query.all()}
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
@@ -94,9 +99,9 @@ def export_articles_csv(source_id=None, unread_only=False, bookmarked_only=False
     return buffer.getvalue()
 
 
-def export_articles_markdown(source_id=None, unread_only=False, bookmarked_only=False):
+def export_articles_markdown(source_id=None, unread_only=False, bookmarked_only=False, category=None):
     """Markdown：按订阅源分组，便于归档阅读。"""
-    rows = _query(source_id, unread_only, bookmarked_only).all()
+    rows = _query(source_id, unread_only, bookmarked_only, category).all()
     sources = {source.id: source for source in Source.query.all()}
     grouped = {}
     for article in rows:

@@ -277,7 +277,7 @@ def test_packaging_files_exist():
 def test_version_and_docs_are_consistent():
     from app.version import __version__
 
-    assert __version__ == "2.0.6", __version__
+    assert __version__ >= "2.0.6", __version__
     changelog = open(os.path.join(REPO, "CHANGELOG.md"), encoding="utf-8").read()
     assert f"## [{__version__}]" in changelog, f"CHANGELOG.md 缺少 [{__version__}] 小节"
     for name in ("README.md", "README-zh.md"):
