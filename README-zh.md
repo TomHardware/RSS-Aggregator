@@ -90,12 +90,17 @@ rss_aggregator/
 │   ├── fulltext.py          # 全文提取
 │   ├── search.py            # 搜索过滤
 │   ├── notifications.py     # 邮件通知
+│   ├── static/
+│   │   ├── app.css          # 设计系统：令牌、主题、组件
+│   │   └── theme.js         # 浅色/深色主题切换（加载不闪白屏）
 │   └── web/
 │       ├── __init__.py
 │       ├── routes.py        # 路由与视图
 │       └── templates/
-│           ├── index.html   # 主页面模板
 │           ├── base.html    # 公共布局（页头、主题切换、轮询）
+│           ├── index.html   # 主页面：列表、搜索、导出
+│           ├── reader.html  # 阅读视图（进度条、快捷键）
+│           ├── stats.html   # 统计页（柱状图、按源分布）
 │           ├── login.html   # 登录页模板
 │           └── console.html # 网页控制台（仪表盘 + 批量操作）
 ├── tests/
@@ -104,10 +109,10 @@ rss_aggregator/
 │   ├── test_v14_bugs.py       # v1.4 审查用例 + 仓库布局检查（7 例）
 │   ├── test_v2_bugs.py        # v2.0.1 功能与修复用例（16 例）
 │   ├── test_v202_bugs.py      # v2.0.2 任务接口、轮询与修复用例（14 例）
-│   ├── test_v204_bugs.py      # v2.0.4 GUI 与控制台用例（14 例）
-│   ├── test_v205_bugs.py      # v2.0.5 界面、收藏、导出与跨平台用例
-│   ├── test_v206_bugs.py      # v2.0.6 阅读视图与 GUI 移除用例
-│   ├── test_v207_bugs.py      # v2.0.7 高亮、缩略图、统计与视觉用例
+│   ├── test_v204_bugs.py      # v2.0.4 控制台与共享业务层用例（10 例）
+│   ├── test_v205_bugs.py      # v2.0.5 界面、收藏、导出与跨平台用例（17 例）
+│   ├── test_v206_bugs.py      # v2.0.6 阅读视图与 GUI 移除用例（17 例）
+│   ├── test_v207_bugs.py      # v2.0.7 高亮、缩略图、统计与视觉用例（17 例）
 │   ├── test_e2e_smoke.py      # 端到端冒烟测试（会真的启动服务）
 │   └── test_debug_reloader.py # 验证 --debug 下调度器只启动一次
 ├── main.py                  # 网页版入口

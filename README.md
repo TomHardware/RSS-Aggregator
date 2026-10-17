@@ -90,12 +90,17 @@ rss_aggregator/
 │   ├── fulltext.py          # Full-text extraction
 │   ├── search.py            # Search and filter
 │   ├── notifications.py     # Email notifications
+│   ├── static/
+│   │   ├── app.css          # Design system: tokens, themes, components
+│   │   └── theme.js         # Light/dark theme switching (no flash on load)
 │   └── web/
 │       ├── __init__.py
 │       ├── routes.py        # Routes and views
 │       └── templates/
-│           ├── index.html   # Main page template
 │           ├── base.html    # Shared layout (header, theme toggle, polling)
+│           ├── index.html   # Main page: list, search, export
+│           ├── reader.html  # Reading view (progress bar, shortcuts)
+│           ├── stats.html   # Statistics page (chart, per-feed breakdown)
 │           ├── login.html   # Sign-in page
 │           └── console.html # Web console (dashboard + bulk actions)
 ├── tests/
@@ -104,10 +109,10 @@ rss_aggregator/
 │   ├── test_v14_bugs.py       # v1.4 audit tests + repository layout checks (7 cases)
 │   ├── test_v2_bugs.py        # v2.0.1 features and fixes (16 cases)
 │   ├── test_v202_bugs.py      # v2.0.2 task API, polling and fixes (14 cases)
-│   ├── test_v204_bugs.py      # v2.0.4 GUI and console checks (14 cases)
-│   ├── test_v205_bugs.py      # v2.0.5 UI, bookmarks, export and platform checks
-│   ├── test_v206_bugs.py      # v2.0.6 reading view and GUI removal checks
-│   ├── test_v207_bugs.py      # v2.0.7 highlight, thumbnails, stats and visual checks
+│   ├── test_v204_bugs.py      # v2.0.4 console and shared-service checks (10 cases)
+│   ├── test_v205_bugs.py      # v2.0.5 UI, bookmarks, export and platform checks (17 cases)
+│   ├── test_v206_bugs.py      # v2.0.6 reading view and GUI removal checks (17 cases)
+│   ├── test_v207_bugs.py      # v2.0.7 highlight, thumbnails, stats and visual checks (17 cases)
 │   ├── test_e2e_smoke.py      # End-to-end smoke test (starts a real server)
 │   └── test_debug_reloader.py # Verifies the scheduler starts only once under --debug
 ├── main.py                  # Web entry point
