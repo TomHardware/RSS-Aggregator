@@ -155,6 +155,8 @@ TRANSLATIONS = {
         "category": "Category",
         "all_categories": "All categories",
         "reading_view": "Reading view",
+        "skip_to_content": "Skip to content",
+        "load_more": "Load more",
         # v2.0.7：统计、高亮与命令面板
         "stats_title": "Statistics",
         "stats_articles": "Articles",
@@ -325,6 +327,8 @@ TRANSLATIONS = {
         "category": "分类",
         "all_categories": "全部分类",
         "reading_view": "阅读视图",
+        "skip_to_content": "跳到正文",
+        "load_more": "加载更多",
         # v2.0.7：统计、高亮与命令面板
         "stats_title": "统计",
         "stats_articles": "文章总数",

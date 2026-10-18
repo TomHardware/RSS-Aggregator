@@ -4,7 +4,7 @@
 避免出现「git 标签是 v2.0.2、文档写着 1.1.0」这类不一致。
 """
 
-__version__ = "2.0.7"
+__version__ = "2.0.8"
 __version_info__ = tuple(int(part) for part in __version__.split("."))
 
 GITHUB_URL = "https://github.com/forestwolf-ai/RSS-Aggregator"

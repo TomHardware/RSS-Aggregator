@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**Current version: 2.0.7** &nbsp;·&nbsp; `/healthz` reports it too.
+**Current version: 2.0.8** &nbsp;·&nbsp; `/healthz` reports it too.
 
 A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML import/export, full-text extraction, search, email notifications, and a bilingual web interface. Ideal for personal or team use in information aggregation, content monitoring, and reading management.
 
@@ -38,6 +38,10 @@ A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML im
 - **Statistics page**: `/stats` shows totals, a 14-day activity chart drawn with pure CSS, and a per-feed read-ratio breakdown.
 - **Command palette**: press `Ctrl`/`Cmd` + `K` to jump to any article, feed or page with the keyboard.
 - **Refined visual design**: soft gradient glow, a frosted sticky header, card hover lift and skeleton placeholders while fetching.
+- **Infinite scroll**: the list loads the next page as you reach the bottom; the fragments are rendered server-side so they match the first page exactly.
+- **Live search**: typing two characters shows a dropdown of matching articles that link straight to the reading view.
+- **Live updates over SSE**: `GET /api/events` streams task progress and unread counts, with an indicator dot and automatic fallback to polling.
+- **JSON API**: `GET /api/articles` exposes paginated articles with every filter for scripting and integrations.
 - **Light and dark themes**: the web UI follows your system preference automatically and can be switched manually; the choice is remembered per browser.
 - **Bookmarks**: star any article and filter to bookmarked items only, straight from the web interface.
 - **Data export**: download your articles as JSON (full backup), CSV (opens in Excel) or Markdown (reading archive).
@@ -83,6 +87,7 @@ rss_aggregator/
 │   ├── reader.py            # Reading-view helpers (plain text, paragraphs, reading time)
 │   ├── highlight.py         # Safe search-term highlighting
 │   ├── stats.py             # Aggregates for the statistics page
+│   ├── web/api_live.py      # Paginated API (JSON/HTML) and SSE stream
 │   ├── exporter.py          # Article export: JSON / CSV / Markdown
 │   ├── platform_utils.py    # Windows / macOS / Linux differences in one place
 │   ├── i18n.py              # English/Chinese translations
@@ -113,6 +118,7 @@ rss_aggregator/
 │   ├── test_v205_bugs.py      # v2.0.5 UI, bookmarks, export and platform checks (17 cases)
 │   ├── test_v206_bugs.py      # v2.0.6 reading view and GUI removal checks (17 cases)
 │   ├── test_v207_bugs.py      # v2.0.7 highlight, thumbnails, stats and visual checks (17 cases)
+│   ├── test_v208_bugs.py      # v2.0.8 API, SSE, infinite scroll and fixes (15 cases)
 │   ├── test_e2e_smoke.py      # End-to-end smoke test (starts a real server)
 │   └── test_debug_reloader.py # Verifies the scheduler starts only once under --debug
 ├── main.py                  # Web entry point

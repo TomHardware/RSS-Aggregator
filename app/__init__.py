@@ -129,6 +129,7 @@ def create_app(config_path=None):
 
     from app.auth import auth_enabled, require_login
     from app.web.routes import web_bp
+    from app.web import api_live  # noqa: F401 - 注册 /api/articles 与 /api/events
 
     app.register_blueprint(web_bp)
     app.before_request(require_login)

@@ -10,7 +10,7 @@
     <script src="{{ url_for('static', filename='theme.js') }}"></script>
 </head>
 <body>
-    <a class="skip-link" href="#main">Skip to content / 跳到正文</a>
+    <a class="skip-link" href="#main">{{ _('skip_to_content') }}</a>
 
     <header class="app-header">
         <h1>{{ app_name }}</h1>
@@ -84,10 +84,10 @@
             <div class="row" style="margin-top:10px">
                 <span class="pill">{{ _('category') }}</span>
                 <a class="btn {% if not search_category %}btn-primary{% endif %}"
-                   href="{{ url_for('web.search', **dict(request.args.to_dict(), category=None)) }}">{{ _('all_categories') }}</a>
+                   href="{{ url_for('web.search', **dict(request.args.to_dict(), category=None, page=None)) }}">{{ _('all_categories') }}</a>
                 {% for item in categories %}
                     <a class="btn {% if search_category == item.name %}btn-primary{% endif %}"
-                       href="{{ url_for('web.search', category=item.name) }}">{{ item.name }} <span class="pill">{{ item.count }}</span></a>
+                       href="{{ url_for('web.search', **dict(request.args.to_dict(), category=item.name, page=None)) }}">{{ item.name }} <span class="pill">{{ item.count }}</span></a>
                 {% endfor %}
             </div>
             {% endif %}
@@ -174,37 +174,17 @@
             <section class="card">
                 <h2>{{ _('articles') }} ({{ articles.total }})</h2>
                 {% if articles.items %}
-                    {% for article in articles.items %}
-                    <article class="article {% if article.read %}is-read{% endif %}" id="article-{{ article.id }}">
-                        {% set image = thumb(article) %}
-                        {% if image %}
-                            <img class="thumb" src="{{ image }}" alt="" loading="lazy" decoding="async"
-                                 referrerpolicy="no-referrer"
-                                 onerror="this.remove()">
+                    {% set items = articles.items %}
+                    {% include "_cards.html" %}
+                    <div id="scroll-sentinel" class="scroll-sentinel"
+                         data-api="{{ url_for('web.api_articles') }}"
+                         data-page="{{ articles.page }}"
+                         data-has-next="{{ '1' if articles.has_next else '0' }}"
+                         data-filters="{{ request.query_string.decode('utf-8') }}">
+                        {% if articles.has_next %}
+                            <a class="btn" href="{{ page_url(articles.next_num) }}">{{ _('load_more') }}</a>
                         {% endif %}
-                        <h3>
-                            <a href="{{ url_for('web.article_detail', article_id=article.id) }}">{{ hl(article.title)|safe }}</a>
-                            <a href="{{ article.link }}" target="_blank" rel="noopener noreferrer"
-                               title="{{ _('open_original') }}" aria-label="{{ _('open_original') }}"
-                               style="font-size:13px;color:var(--text-dim)">↗</a>
-                        </h3>
-                        <div class="meta">
-                            <span>{{ source_names.get(article.source_id, '') }}</span>
-                            <span>{{ article.published or '' }}</span>
-                            {% if article.summary %}
-                                <span>{{ _('reading_time', minutes=[1, (article.summary|length // 500) + 1]|max) }}</span>
-                            {% endif %}
-                            <button type="button" class="btn btn-icon bookmark-toggle"
-                                    data-url="{{ url_for('web.bookmark_article', article_id=article.id, ajax=1) }}"
-                                    aria-pressed="{{ 'true' if article.bookmarked else 'false' }}"
-                                    aria-label="{{ _('mark_bookmark') }}">{{ '★' if article.bookmarked else '☆' }}</button>
-                            <form action="{{ url_for('web.mark_unread' if article.read else 'web.mark_read', article_id=article.id) }}" method="post" style="display:inline">
-                                <button type="submit" class="btn btn-icon">{{ _('mark_unread') if article.read else _('mark_read') }}</button>
-                            </form>
-                        </div>
-                        {% if article.summary %}<p class="summary">{{ hl(article.summary[:300])|safe }}{% if article.summary|length > 300 %}…{% endif %}</p>{% endif %}
-                    </article>
-                    {% endfor %}
+                    </div>
 
                     {% if articles.pages > 1 %}
                     <nav class="row" style="margin-top:12px" aria-label="pagination">
@@ -390,6 +370,149 @@
             if (event.target === mask) close();
         });
     })();
+
+    // ---------------------------------------------------------------------
+    // v2.0.8：无限滚动、即时搜索与 SSE 实时状态
+    // ---------------------------------------------------------------------
+    (function () {
+        const sentinel = document.getElementById('scroll-sentinel');
+        const list = document.querySelector('main');
+
+        // 无限滚动：接近底部时拉取下一页片段并追加（服务端渲染，样式一致）
+        if (sentinel && window.IntersectionObserver) {
+            let page = parseInt(sentinel.dataset.page || '1', 10);
+            let loading = false;
+            let hasNext = sentinel.dataset.hasNext === '1';
+
+            async function loadMore() {
+                if (loading || !hasNext) return;
+                loading = true;
+                sentinel.classList.add('is-loading');
+                try {
+                    const params = new URLSearchParams(sentinel.dataset.filters || '');
+                    params.set('page', String(page + 1));
+                    params.set('html', '1');
+                    const resp = await fetch(sentinel.dataset.api + '?' + params.toString(), {
+                        headers: {'Accept': 'text/html'}, credentials: 'same-origin',
+                    });
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    const markup = await resp.text();
+                    if (!markup.trim()) { hasNext = false; return; }
+                    sentinel.insertAdjacentHTML('beforebegin', markup);
+                    page += 1;
+                    hasNext = markup.includes('article-');
+                    sentinel.dataset.page = String(page);
+                } catch (err) {
+                    hasNext = false;  // 出错就停止自动加载，避免死循环
+                } finally {
+                    loading = false;
+                    sentinel.classList.remove('is-loading');
+                }
+            }
+
+            const observer = new IntersectionObserver(function (entries) {
+                if (entries.some(entry => entry.isIntersecting)) loadMore();
+            }, {rootMargin: '400px'});
+            observer.observe(sentinel);
+        }
+
+        // 即时搜索：输入 250ms 后请求片段，显示下拉结果
+        const searchInput = document.querySelector('input[type=search]');
+        if (searchInput) {
+            const box = document.createElement('div');
+            box.className = 'live-search';
+            box.hidden = true;
+            searchInput.parentNode.style.position = 'relative';
+            searchInput.parentNode.appendChild(box);
+
+            let timer = null;
+            let seq = 0;
+
+            function close() { box.hidden = true; box.innerHTML = ''; }
+
+            async function query(value) {
+                const mine = ++seq;
+                const params = new URLSearchParams({q: value, limit: '6'});
+                try {
+                    const resp = await fetch(sentinel.dataset.api + '?' + params.toString(), {
+                        headers: {'Accept': 'application/json'}, credentials: 'same-origin',
+                    });
+                    if (!resp.ok) return;
+                    const data = await resp.json();
+                    if (mine !== seq) return;   // 丢弃过期响应，避免结果闪回
+                    if (!data.items || !data.items.length) { close(); return; }
+                    box.innerHTML = '';
+                    data.items.forEach(function (item) {
+                        const row = document.createElement('a');
+                        row.className = 'live-row';
+                        row.href = '/article/' + item.id;
+                        const title = document.createElement('span');
+                        title.textContent = item.title || '(untitled)';
+                        const meta = document.createElement('small');
+                        meta.textContent = (item.published || '').slice(0, 10);
+                        row.appendChild(title);
+                        row.appendChild(meta);
+                        box.appendChild(row);
+                    });
+                    box.hidden = false;
+                } catch (err) { /* 网络抖动忽略 */ }
+            }
+
+            searchInput.addEventListener('input', function () {
+                const value = searchInput.value.trim();
+                if (timer) clearTimeout(timer);
+                if (value.length < 2) { close(); return; }
+                timer = setTimeout(function () { query(value); }, 250);
+            });
+            searchInput.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') close();
+            });
+            document.addEventListener('click', function (event) {
+                if (!box.contains(event.target) && event.target !== searchInput) close();
+            });
+        }
+
+        // SSE：实时接收任务与未读数；断线自动退回轮询（page 已有轮询逻辑）
+        if (window.EventSource) {
+            const dot = document.createElement('span');
+            dot.className = 'live-dot';
+            dot.title = 'live';
+            const header = document.querySelector('header.app-header');
+            if (header) header.appendChild(dot);
+
+            let source = null;
+            let retries = 0;
+
+            function connect() {
+                source = new EventSource('/api/events');
+                source.onopen = function () { dot.classList.add('is-on'); retries = 0; };
+                source.onmessage = function (event) {
+                    let data;
+                    try { data = JSON.parse(event.data); } catch (e) { return; }
+                    const counter = document.getElementById('unread-total');
+                    if (counter && typeof data.unread_total === 'number') {
+                        counter.textContent = data.unread_total;
+                    }
+                    const box = document.getElementById('task-status');
+                    if (box && data.running && data.running.length) {
+                        box.textContent = data.running.map(function (task) {
+                            return task.source_name || ('#' + task.source_id);
+                        }).join(' · ');
+                        box.classList.add('is-active');
+                    } else if (box) {
+                        box.classList.remove('is-active');
+                    }
+                };
+                source.onerror = function () {
+                    dot.classList.remove('is-on');
+                    source.close();
+                    if (retries++ < 5) setTimeout(connect, 2000 * retries);
+                };
+            }
+            connect();
+        }
+    })();
+
     // Toast：收藏等轻量操作给出即时反馈，不打断当前页面
     function notify(text) {
         const toast = document.getElementById('toast');

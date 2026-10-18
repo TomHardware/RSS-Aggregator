@@ -8,6 +8,56 @@
 
 ---
 
+## [2.0.8] - 2026-10-17
+
+实时交互版本：新增分页接口与 SSE 实时推送，网页支持无限滚动与即时搜索，并修复 4 项缺陷。
+Real-time release: adds a paginated API and SSE push, infinite scroll and live search in the web UI, plus four bug fixes.
+
+### 新增功能 / Added
+
+- **分页接口**：`GET /api/articles` 支持分页与全部筛选条件，返回结构化 JSON。
+- *Pagination API: `GET /api/articles` pages through articles with every filter and returns structured JSON.*
+- 同一接口加 `html=1` 会返回**服务端渲染的文章片段**，前端直接追加即可。
+- *The same endpoint with `html=1` returns **server-rendered article markup**, ready for the frontend to append.*
+- **无限滚动**：滚动到底部自动加载下一页，不再需要翻页按钮。
+- *Infinite scroll: reaching the bottom loads the next page automatically, so pagination buttons are no longer needed.*
+- 卡片片段由服务端渲染，保证「加载更多」与首屏的样式完全一致。
+- *The card fragment is rendered server-side, so appended items look exactly like the first page.*
+- **即时搜索**：搜索框输入两个字符即开始查询，下拉显示匹配的文章，点击直达阅读页。
+- *Live search: typing two characters queries the API and shows a dropdown of matches that link straight to the reading view.*
+- 输入做了防抖与请求序号控制，快速输入不会出现旧结果覆盖新结果。
+- *Input is debounced and responses are sequence-checked, so fast typing never lets a stale result overwrite a newer one.*
+- **SSE 实时推送**：新增 `GET /api/events`，用 Server-Sent Events 推送任务进展与未读数。
+- *SSE push: `GET /api/events` streams task progress and the unread count via Server-Sent Events.*
+- 页头出现一个连接指示灯，连上为绿色；断线会自动重连，最终退回原有的轮询。
+- *A connection dot in the header turns green when connected; dropped connections retry and finally fall back to polling.*
+- 推送只在实际变化时发送，其余时间发送心跳，减少无谓流量。
+- *Events are only sent when something changes; otherwise a heartbeat keeps the connection alive.*
+- **后端与前端分离**：新增 `app/web/api_live.py` 承载实时接口，路由文件不再继续膨胀。
+- *Backend/frontend split: `app/web/api_live.py` holds the live endpoints so the routing module stops growing.*
+
+### 修复 / Fixed
+
+- **未读缓存跨实例串用**：缓存原本挂在模块全局，同一进程里的其它应用实例会读到别的库的计数；现在按应用实例隔离。
+- *The unread cache leaked across instances: it lived in a module global, so other app instances in the same process read another database's counts; it is now isolated per application.*
+- **标记已读后未读数不刷新**：写操作没有让缓存失效，页面最多 3 秒显示旧数字。
+- *Unread counts did not refresh after marking read: writes never invalidated the cache, leaving stale numbers for up to three seconds.*
+- **老文章的上一篇/下一篇消失**：导航只扫最近 300 条，更早的文章没有上下篇链接。
+- *Newer/older links vanished for older articles: navigation only scanned the latest 300, leaving early articles without links.*
+- **切换分类会丢掉当前筛选**：点分类链接后搜索词与未读条件被清空；现在会一并保留。
+- *Switching category dropped active filters: clicking a category cleared the search term and unread filter; both are now preserved.*
+- **跳过导航的文案写死双语**：页面里硬编码「Skip to content / 跳到正文」，现在按界面语言显示。
+- *The skip link was hardcoded in both languages inside the markup; it now follows the interface language.*
+
+### 兼容性 / Compatibility
+
+- 数据库结构不变，无需迁移。
+- *The database schema is unchanged, so no migration is needed.*
+- 未引入任何第三方依赖：SSE、无限滚动与即时搜索都是原生实现。
+- *No third-party dependency was added: SSE, infinite scroll and live search are hand-rolled.*
+- 新动效同样尊重系统的「减少动态效果」设置。
+- *New animations also respect the system reduce-motion setting.*
+
 ## [2.0.7] - 2026-10-17
 
 视觉与数据洞察版本：网页视觉按现代站点风格重做，新增统计页、搜索高亮、文章缩略图与命令面板。

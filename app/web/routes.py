@@ -177,7 +177,7 @@ def _context(**extra):
     return context
 
 
-_UNREAD_CACHE = {"at": 0.0, "value": ({}, 0)}
+_UNREAD_CACHE_KEY = "rss_unread_cache"
 
 
 def _unread_counts(max_age=3.0):
@@ -188,8 +188,11 @@ def _unread_counts(max_age=3.0):
     import time as _time
 
     now = _time.time()
-    if now - _UNREAD_CACHE["at"] < max_age:
-        return _UNREAD_CACHE["value"]
+    # 缓存挂在应用实例上而不是模块全局：模块级缓存会被同一进程里的其它应用实例
+    # （测试、多实例部署）串用，导致刚标记已读却仍显示旧未读数。
+    cache = current_app.extensions.setdefault(_UNREAD_CACHE_KEY, {"at": 0.0, "value": ({}, 0)})
+    if now - cache["at"] < max_age:
+        return cache["value"]
     try:
         rows = (
             db.session.query(Article.source_id, func.count(Article.id))
@@ -202,8 +205,13 @@ def _unread_counts(max_age=3.0):
         return {}, 0
     counts = {source_id: count for source_id, count in rows}
     value = (counts, sum(counts.values()))
-    _UNREAD_CACHE.update({"at": now, "value": value})
+    cache.update({"at": now, "value": value})
     return value
+
+
+def invalidate_unread_cache():
+    """写操作后调用：否则标记已读后最多 3 秒内页面仍显示旧的未读数。"""
+    current_app.extensions.setdefault(_UNREAD_CACHE_KEY, {"at": 0.0, "value": ({}, 0)})["at"] = 0.0
 
 
 def _parse_interval(raw, default=DEFAULT_INTERVAL_MINUTES):
@@ -382,21 +390,37 @@ def search():
 # --------------------------------------------------------------------------- #
 # 阅读视图与批量操作
 # --------------------------------------------------------------------------- #
-def _neighbours(article, window=300):
-    """在最近的文章里找出上一篇 / 下一篇文章 id。
+def _neighbours(article):
+    """找出上一篇 / 下一篇文章 id。
 
-    只扫有限条数：个人阅读器的规模下足够，也避免为了两个链接做全表排序。
+    按 (published, id) 排序比较，而不是「取最近 N 条再找自己」——
+    后者对超过 N 条之前的老文章会静默返回 None，读者点进去就没有上下篇链接。
     """
-    recent = (
-        Article.query.order_by(Article.published.desc(), Article.id.desc()).limit(window).all()
+    published = article.published
+    key_id = article.id or 0
+
+    older_query = Article.query.filter(Article.id != key_id)
+    newer_query = Article.query.filter(Article.id != key_id)
+
+    if published is None:
+        # 没有发布时间的文章退化为按 id 排序，保证仍可导航
+        older = older_query.filter(Article.id < key_id).order_by(Article.id.desc()).first()
+        newer = newer_query.filter(Article.id > key_id).order_by(Article.id.asc()).first()
+        return (newer.id if newer else None), (older.id if older else None)
+
+    older = (
+        older_query.filter((Article.published < published)
+                           | ((Article.published == published) & (Article.id < key_id)))
+        .order_by(Article.published.desc(), Article.id.desc())
+        .first()
     )
-    ids = [item.id for item in recent]
-    if article.id not in ids:
-        return None, None
-    index = ids.index(article.id)
-    newer = ids[index - 1] if index > 0 else None
-    older = ids[index + 1] if index + 1 < len(ids) else None
-    return newer, older
+    newer = (
+        newer_query.filter((Article.published > published)
+                           | ((Article.published == published) & (Article.id > key_id)))
+        .order_by(Article.published.asc(), Article.id.asc())
+        .first()
+    )
+    return (newer.id if newer else None), (older.id if older else None)
 
 
 @web_bp.route("/article/<int:article_id>")
@@ -433,6 +457,7 @@ def mark_all_read():
         query = query.filter(Article.source_id == source_id)
     updated = query.update({Article.read: True}, synchronize_session=False)
     db.session.commit()
+    invalidate_unread_cache()
     flash(_t("msg_marked_all_read", count=updated))
     logger.info("批量标记已读：%d 篇（source=%s）", updated, source_id or "全部")
     target = request.form.get("next") or request.referrer or url_for("web.index")
@@ -458,6 +483,7 @@ def bookmark_article(article_id):
     if request.args.get("ajax"):
         return jsonify({"id": article.id, "bookmarked": bool(article.bookmarked)})
     flash(_t("msg_bookmark_on") if article.bookmarked else _t("msg_bookmark_off"))
+    invalidate_unread_cache()
     return redirect(_local_redirect(request.referrer or url_for("web.index"), url_for("web.index")))
 
 
@@ -779,6 +805,7 @@ def mark_read(article_id):
     article = db.get_or_404(Article, article_id)
     article.read = True
     db.session.commit()
+    invalidate_unread_cache()
     return redirect(
         _local_redirect(request.form.get("next"), url_for("web.index"))
     )
@@ -789,6 +816,7 @@ def mark_unread(article_id):
     article = db.get_or_404(Article, article_id)
     article.read = False
     db.session.commit()
+    invalidate_unread_cache()
     return redirect(
         _local_redirect(request.form.get("next"), url_for("web.index"))
     )

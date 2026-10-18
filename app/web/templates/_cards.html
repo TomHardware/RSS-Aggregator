@@ -1,0 +1,30 @@
+{% for article in items %}
+<article class="article {% if article.read %}is-read{% endif %}" id="article-{{ article.id }}">
+    {% set image = thumb(article) %}
+    {% if image %}
+        <img class="thumb" src="{{ image }}" alt="" loading="lazy" decoding="async"
+             referrerpolicy="no-referrer" onerror="this.remove()">
+    {% endif %}
+    <h3>
+        <a href="{{ url_for('web.article_detail', article_id=article.id) }}">{{ hl(article.title)|safe }}</a>
+        <a href="{{ article.link }}" target="_blank" rel="noopener noreferrer"
+           title="{{ _('open_original') }}" aria-label="{{ _('open_original') }}"
+           style="font-size:13px;color:var(--text-dim)">↗</a>
+    </h3>
+    <div class="meta">
+        <span>{{ source_names.get(article.source_id, '') }}</span>
+        <span>{{ article.published or '' }}</span>
+        {% if article.summary %}
+            <span>{{ _('reading_time', minutes=[1, (article.summary|length // 500) + 1]|max) }}</span>
+        {% endif %}
+        <button type="button" class="btn btn-icon bookmark-toggle"
+                data-url="{{ url_for('web.bookmark_article', article_id=article.id, ajax=1) }}"
+                aria-pressed="{{ 'true' if article.bookmarked else 'false' }}"
+                aria-label="{{ _('mark_bookmark') }}">{{ '★' if article.bookmarked else '☆' }}</button>
+        <form action="{{ url_for('web.mark_unread' if article.read else 'web.mark_read', article_id=article.id) }}" method="post" style="display:inline">
+            <button type="submit" class="btn btn-icon">{{ _('mark_unread') if article.read else _('mark_read') }}</button>
+        </form>
+    </div>
+    {% if article.summary %}<p class="summary">{{ hl(article.summary[:300])|safe }}{% if article.summary|length > 300 %}…{% endif %}</p>{% endif %}
+</article>
+{% endfor %}
