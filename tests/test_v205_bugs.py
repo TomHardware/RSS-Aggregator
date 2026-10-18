@@ -73,12 +73,15 @@ def test_css_supports_system_and_manual_themes():
 
 @test
 def test_theme_script_avoids_flash_and_remembers_choice():
-    with open(os.path.join(REPO, "app", "static", "theme.js"), encoding="utf-8") as fh:
-        js = fh.read()
-    assert "localStorage" in js, "主题选择没有被记住"
-    assert "matchMedia" in js, "没有读取系统偏好"
-    # 必须在 DOMContentLoaded 之前就应用，否则深色下会闪白屏
-    assert js.index("apply(stored())") < js.index("DOMContentLoaded"), "主题应用晚于 DOM 就绪，会闪白"
+    theme = open(os.path.join(REPO, "app", "static", "theme.js"), encoding="utf-8").read()
+    app_js = open(os.path.join(REPO, "app", "static", "app.js"), encoding="utf-8").read()
+    assert "localStorage" in theme, "主题选择没有被记住"
+    assert "matchMedia" in theme, "没有读取系统偏好"
+    # 预渲染脚本必须同步执行（不能等 DOMContentLoaded），否则会闪白
+    assert "DOMContentLoaded" not in theme, "主题脚本不应延迟到 DOM 就绪"
+    assert "data-theme" in theme, "没有把主题写到 <html>"
+    # 切换逻辑在 app.js 里
+    assert "rss-theme" in app_js and "applyTheme" in app_js, "app.js 缺少主题切换"
 
 
 @test

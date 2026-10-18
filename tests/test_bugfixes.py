@@ -253,7 +253,10 @@ def test_pages_render():
         assert "render me" in index.data.decode("utf-8"), "首页没有渲染文章列表"
         search = client.get("/search?q=render")
         assert search.status_code == 200, f"搜索页返回 {search.status_code}"
-        assert "render me" in search.data.decode("utf-8"), "搜索页没有渲染结果"
+        import re as _re
+
+        _plain = _re.sub(r"<[^>]+>", "", search.data.decode("utf-8"))
+        assert "render me" in _plain, "搜索页没有渲染结果"
     finally:
         env.close()
 

@@ -8,6 +8,64 @@
 
 ---
 
+## [2.0.9] - 2026-10-18
+
+界面重构版本：Web UI 按桌面级应用重做（侧栏工作区 + 密度 + 强调色），交互逻辑抽成单一模块，并新增批量操作。
+Interface rewrite: the web UI is rebuilt as a desktop-grade workspace (sidebar, density, accent colour), interaction logic moves into one module, and batch actions are added.
+
+### 新增功能 / Added
+
+- **侧栏工作区**：左侧固定侧栏承载视图与订阅源，右侧专注内容，取代旧版顶部导航。
+- *Sidebar workspace: a fixed left sidebar holds views and feeds while the right side stays focused on content, replacing the old top-bar navigation.*
+- **智能视图**：全部 / 未读 / 收藏 / 今天四个视图，各自显示实时计数。
+- *Smart views: All, Unread, Starred and Today, each with a live count.*
+- **订阅源侧栏**：所有订阅源按名称排列并显示未读数，点击即可只看该源。
+- *Feed sidebar: every feed is listed alphabetically with its unread count; one click filters to that feed.*
+- **批量操作**：勾选任意文章后可一次标记已读、未读、收藏、取消收藏或删除。
+- *Batch actions: select any articles and mark them read, unread, bookmarked, unbookmarked or delete them in one go.*
+- 批量请求走 `POST /api/articles/batch`，单次上限 500 条，返回受影响行数。
+- *Batch requests go through `POST /api/articles/batch`, capped at 500 ids per call and returning the affected row count.*
+- **单篇删除**：文章可以从列表里单独删除，不影响订阅源。
+- *Single deletion: an article can be removed on its own without touching its feed.*
+- **外观可调**：侧栏可切换五种强调色与两档列表密度，选择按浏览器保存。
+- *Tunable appearance: five accent colours and two list densities switchable from the sidebar and remembered per browser.*
+- **交互逻辑收拢**：命令面板、快捷键、无限滚动、即时搜索、SSE、Toast、批量选择全部移入 `app/static/app.js`。
+- *Interaction logic consolidated: command palette, shortcuts, infinite scroll, live search, SSE, toasts and batch selection all live in `app/static/app.js`.*
+- 模板因此保持声明式，不再内联大段脚本，改版时不必在 HTML 与 JS 之间来回找。
+- *Templates stay declarative with no inline scripts, so restyling no longer means hunting between HTML and JS.*
+- **设计体系重写**：新的令牌体系覆盖颜色、圆角、间距、字号与密度，深浅色各一套。
+- *Design-system rewrite: a new token set covers colour, radius, spacing, type size and density, one set per theme.*
+- 列表改为紧凑行式布局，标题、来源、时间、阅读时长与操作按钮在一行内对齐。
+- *Lists became compact rows with title, feed, time, reading time and actions aligned on one line.*
+
+### 修复 / Fixed
+
+- **命令面板怎么点都关不掉（阻塞级）**：遮罩层用 `display: flex` 布局，压过了浏览器对 `[hidden]` 的默认隐藏规则，于是 `hidden = true` 毫无效果；现在为 `[hidden]` 增加了全局兜底，关闭时还会同时写入内联样式。
+- *The command palette could not be closed at all: the backdrop used `display: flex`, which overrode the browser's default `[hidden] { display: none }`, so setting `hidden = true` did nothing; `[hidden]` now has a global fallback and closing also writes inline styles.*
+- **命令面板在初始化时默认打开**：现在启动即关闭，只有点击或快捷键才会唤起。
+- *The palette started open on load: it is now closed by default and only opens on click or shortcut.*
+- **点面板内部也会误关**：遮罩的点击判定改为排除面板区域，并阻止内部点击冒泡。
+- *Clicks inside the panel closed it by mistake: backdrop handling now excludes the panel and stops propagation from inside it.*
+- **文章勾选框挤在标题上方单独占一行**：改为绝对定位到行左侧留白处。
+- *The article checkbox occupied its own line above the title: it is now absolutely positioned in the row's left gutter.*
+- **摘要重复显示两遍**：部分 feed 的摘要本身就含重复句子，渲染前做了去重并跳过与标题相同的摘要。
+- *Summaries appeared twice: some feeds repeat sentences in their summaries, so duplicates are collapsed and summaries equal to the title are skipped.*
+- **时间戳带着微秒**：列表中的发布时间现在截到分钟。
+- *Timestamps showed microseconds: publish times in lists are now trimmed to the minute.*
+- **登录页在缺少侧栏上下文时无法渲染**：基础模板现在对可选变量做了默认值兜底。
+- *The sign-in page failed to render without sidebar context; the base template now falls back to defaults for optional variables.*
+- **搜索与过滤页面的文本断言失效**：关键词高亮会插入 `<mark>`，导致连续字符串断言失败；相关用例改为先剥标签再匹配。
+- *Text assertions on search pages broke because keyword highlighting inserts `<mark>`; the affected tests now strip tags before matching.*
+
+### 兼容性 / Compatibility
+
+- 数据库结构不变，无需迁移；旧书签链接仍然可用。
+- *The database schema is unchanged, so no migration is needed, and existing bookmarks keep working.*
+- 未引入任何第三方依赖：侧栏、批量操作与外观切换都是原生实现。
+- *No third-party dependency was added: the sidebar, batch actions and appearance controls are hand-rolled.*
+- 新增 `test_v209_bugs.py` 与 `test_v2091_palette.py`；旧用例中依赖内联脚本的断言已改为检查 `app.js`。
+- *Adds `test_v209_bugs.py` and `test_v2091_palette.py`; older assertions that expected inline scripts now check `app.js`.*
+
 ## [2.0.8] - 2026-10-17
 
 实时交互版本：新增分页接口与 SSE 实时推送，网页支持无限滚动与即时搜索，并修复 4 项缺陷。

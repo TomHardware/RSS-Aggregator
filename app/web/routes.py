@@ -69,6 +69,92 @@ def _language():
     return request.args.get("lang") or current_app.config.get("APP_LANGUAGE", "en")
 
 
+VIEWS = ("all", "unread", "starred", "today")
+
+
+def _today_start():
+    from datetime import datetime
+
+    now = utcnow()
+    return datetime(now.year, now.month, now.day)
+
+
+def _view_query(view):
+    """把「视图」翻译成查询过滤条件。"""
+    query = Article.query
+    if view == "unread":
+        query = query.filter(or_(Article.read.is_(False), Article.read.is_(None)))
+    elif view == "starred":
+        query = query.filter(Article.bookmarked.is_(True))
+    elif view == "today":
+        query = query.filter(Article.published.isnot(None)).filter(
+            Article.published >= _today_start()
+        )
+    return query
+
+
+def _view_counts():
+    """视图计数：让侧栏直接显示还有多少未读 / 收藏。"""
+    counts = {}
+    for view in VIEWS:
+        try:
+            counts[view] = _view_query(view).count()
+        except Exception as exc:  # noqa: BLE001 - 计数失败不应让页面 500
+            logger.warning("视图计数失败 view=%s: %s", view, exc)
+            counts[view] = 0
+    return counts
+
+
+def _views(current):
+    """侧栏视图列表（含当前项高亮所需的信息）。"""
+    from flask import request as _request
+
+    counts = _view_counts()
+    labels = {
+        "all": ("articles", "☰"),
+        "unread": ("unread_only", "●"),
+        "starred": ("bookmarks", "★"),
+        "today": ("view_today", "◷"),
+    }
+    result = []
+    for key in VIEWS:
+        label_key, icon = labels[key]
+        href = url_for("web.index", view=(None if key == "all" else key))
+        result.append({
+            "key": key,
+            "icon": icon,
+            "label": translate(label_key, _language()),
+            "count": counts.get(key, 0) if key != "all" else 0,
+            "href": href,
+        })
+    return result
+
+
+def _sidebar_feeds():
+    """侧栏的订阅源列表（带未读数）。"""
+    counts, _ = _unread_counts()
+    feeds = []
+    for source in Source.query.order_by(Source.name).all():
+        feeds.append({
+            "id": source.id,
+            "name": source.name or source.url,
+            "unread": counts.get(source.id, 0),
+        })
+    return feeds
+
+
+def _palette_items():
+    """命令面板的静态条目（文章由前端从 DOM 里补）。"""
+    return [
+        {"label": translate("console_home", _language()), "hint": "page", "href": url_for("web.index")},
+        {"label": translate("console_title", _language()), "hint": "page", "href": url_for("web.console")},
+        {"label": translate("stats_title", _language()), "hint": "page", "href": url_for("web.stats_page")},
+        {"label": translate("bookmarks", _language()), "hint": "page", "href": url_for("web.bookmarks")},
+        {"label": translate("gui_add_feed", _language()), "hint": "page",
+         "href": url_for("web.console")},
+    ]
+
+
 def _highlight_helper():
     """模板里的高亮函数：把搜索词在标题/摘要里标出来（已转义，安全）。"""
     from app.highlight import highlight, split_terms
@@ -79,6 +165,38 @@ def _highlight_helper():
         return highlight(text, terms)
 
     return _hl
+
+
+def _summary_helper():
+    """摘要预览：去掉与标题重复的内容，并压掉连续重复的句子。
+
+    很多 feed 的 summary 会把同一段文字重复两遍（或者干脆等于全文），
+    直接截断展示会显得像 bug。
+    """
+    import re as _re
+
+    def _preview(article, limit=300):
+        text = (article.summary or "").strip()
+        if not text:
+            return ""
+        # 折叠空白
+        text = _re.sub(r"\s+", " ", text)
+        # 去掉重复的相邻句子（逐句比对，保留第一份）
+        parts = _re.split(r"(?<=[。！？.!?])\s*", text)
+        seen, unique = set(), []
+        for part in parts:
+            key = part.strip()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique.append(key)
+        text = "".join(unique)
+        # summary 与标题完全相同时不重复展示
+        if article.title and text.strip() == article.title.strip():
+            return ""
+        return text[:limit] + ("…" if len(text) > limit else "")
+
+    return _preview
 
 
 def _thumbnail_helper():
@@ -169,8 +287,18 @@ def _context(**extra):
         "export_filters": export_filters,
         "article_count": Article.query.count(),
         "categories": _categories(),
+        "views": _views(request.args.get("view")),
+        "current_view": request.args.get("view") or "all",
+        "current_view_label": translate(
+            {"all": "articles", "unread": "unread_only", "starred": "bookmarks",
+             "today": "view_today"}.get(request.args.get("view") or "all", "articles"),
+            lang,
+        ),
+        "sidebar_feeds": _sidebar_feeds(),
+        "palette_items": _palette_items(),
         "hl": _highlight_helper(),
         "thumb": _thumbnail_helper(),
+        "summary_preview": _summary_helper(),
         "source_names": {source.id: (source.name or source.url) for source in Source.query.all()},
     }
     context.update(extra)
@@ -351,8 +479,12 @@ def logout():
 @web_bp.route("/")
 def index():
     page = request.args.get("page", 1, type=int) or 1
+    view = (request.args.get("view") or "all").lower()
+    if view not in VIEWS:
+        view = "all"
     articles = (
-        Article.query.order_by(Article.published.desc(), Article.id.desc())
+        _view_query(view)
+        .order_by(Article.published.desc(), Article.id.desc())
         .paginate(page=max(1, page), per_page=PER_PAGE, error_out=False)
     )
     return render_template(
@@ -536,6 +668,56 @@ def export_articles(fmt):
         mimetype=mimetype,
         headers={"Content-Disposition": f'attachment; filename="rss-articles-{stamp}.{fmt}"'},
     )
+
+
+@web_bp.route("/api/articles/batch", methods=["POST"])
+def api_batch():
+    """批量操作：已读 / 未读 / 收藏 / 取消收藏 / 删除。"""
+    payload = request.get_json(silent=True) or {}
+    action = (payload.get("action") or "").strip()
+    raw_ids = payload.get("ids") or []
+    ids = []
+    for item in raw_ids:
+        try:
+            ids.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    if not ids:
+        return jsonify({"ok": False, "error": "no ids"}), 400
+    if len(ids) > 500:
+        return jsonify({"ok": False, "error": "too many ids"}), 400
+
+    query = Article.query.filter(Article.id.in_(ids))
+    if action == "read":
+        updated = query.update({Article.read: True}, synchronize_session=False)
+    elif action == "unread":
+        updated = query.update({Article.read: False}, synchronize_session=False)
+    elif action == "bookmark":
+        updated = query.update({Article.bookmarked: True}, synchronize_session=False)
+    elif action == "unbookmark":
+        updated = query.update({Article.bookmarked: False}, synchronize_session=False)
+    elif action == "delete":
+        updated = query.delete(synchronize_session=False)
+    else:
+        return jsonify({"ok": False, "error": "unknown action"}), 400
+
+    db.session.commit()
+    invalidate_unread_cache()
+    logger.info("批量操作 action=%s ids=%d -> %d 行", action, len(ids), updated or 0)
+    return jsonify({"ok": True, "action": action, "updated": updated or 0})
+
+
+@web_bp.route("/article/<int:article_id>/delete", methods=["POST"])
+def delete_article(article_id):
+    """删除单篇文章（不影响订阅源）。"""
+    article = db.session.get(Article, article_id)
+    if article is None:
+        return "article not found", 404, {"Content-Type": "text/plain; charset=utf-8"}
+    db.session.delete(article)
+    db.session.commit()
+    invalidate_unread_cache()
+    flash(_t("msg_article_deleted"))
+    return redirect(_local_redirect(request.form.get("next"), url_for("web.index")))
 
 
 @web_bp.route("/stats")

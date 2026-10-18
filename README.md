@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**Current version: 2.0.8** &nbsp;·&nbsp; `/healthz` reports it too.
+**Current version: 2.0.9** &nbsp;·&nbsp; `/healthz` reports it too.
 
 A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML import/export, full-text extraction, search, email notifications, and a bilingual web interface. Ideal for personal or team use in information aggregation, content monitoring, and reading management.
 
@@ -42,6 +42,10 @@ A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML im
 - **Live search**: typing two characters shows a dropdown of matching articles that link straight to the reading view.
 - **Live updates over SSE**: `GET /api/events` streams task progress and unread counts, with an indicator dot and automatic fallback to polling.
 - **JSON API**: `GET /api/articles` exposes paginated articles with every filter for scripting and integrations.
+- **Sidebar workspace**: views (All / Unread / Starred / Today) and feeds with live unread counts replace the old top-bar navigation.
+- **Batch actions**: select articles and mark them read, unread, bookmarked or delete them in one request.
+- **Tunable appearance**: accent colour and list density are switchable from the sidebar and remembered per browser.
+- **Single JS module**: all interactive behaviour now lives in `app/static/app.js`, so templates stay declarative.
 - **Light and dark themes**: the web UI follows your system preference automatically and can be switched manually; the choice is remembered per browser.
 - **Bookmarks**: star any article and filter to bookmarked items only, straight from the web interface.
 - **Data export**: download your articles as JSON (full backup), CSV (opens in Excel) or Markdown (reading archive).
@@ -96,7 +100,8 @@ rss_aggregator/
 │   ├── search.py            # Search and filter
 │   ├── notifications.py     # Email notifications
 │   ├── static/
-│   │   ├── app.css          # Design system: tokens, themes, components
+│   │   ├── app.css          # Design system: tokens, themes, density, components
+│   │   ├── app.js           # All interactive behaviour (palette, scroll, SSE, batch)
 │   │   └── theme.js         # Light/dark theme switching (no flash on load)
 │   └── web/
 │       ├── __init__.py
@@ -119,6 +124,8 @@ rss_aggregator/
 │   ├── test_v206_bugs.py      # v2.0.6 reading view and GUI removal checks (17 cases)
 │   ├── test_v207_bugs.py      # v2.0.7 highlight, thumbnails, stats and visual checks (17 cases)
 │   ├── test_v208_bugs.py      # v2.0.8 API, SSE, infinite scroll and fixes (15 cases)
+│   ├── test_v209_bugs.py      # v2.0.9 sidebar views, batch actions and appearance (14 cases)
+│   ├── test_v2091_palette.py  # v2.0.9 regression: command palette must be closable (5 cases)
 │   ├── test_e2e_smoke.py      # End-to-end smoke test (starts a real server)
 │   └── test_debug_reloader.py # Verifies the scheduler starts only once under --debug
 ├── main.py                  # Web entry point

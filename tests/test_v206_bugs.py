@@ -212,11 +212,15 @@ def test_index_has_keyboard_shortcuts():
         app = env.app()
         _seed(app)
         body = app.test_client().get("/").data.decode("utf-8")
-        for needle in ("keydown", "shortcut-help", "is-cursor", 'id="toast"', "notify("):
+        # 标记在模板里
+        for needle in ("shortcut-help", 'id="toast"'):
             assert needle in body, f"首页缺少 {needle}"
-        # 快捷键说明里应当出现常用键
         for key in ("<kbd>j</kbd>", "<kbd>k</kbd>", "<kbd>o</kbd>", "<kbd>s</kbd>", "<kbd>m</kbd>"):
             assert key in body, f"快捷键说明缺少 {key}"
+        # 行为在 app.js 里
+        js = open(os.path.join(REPO, "app", "static", "app.js"), encoding="utf-8").read()
+        for needle in ("keydown", "is-cursor", "notify("):
+            assert needle in js, f"app.js 缺少 {needle}"
     finally:
         env.close()
 
@@ -229,7 +233,8 @@ def test_index_links_to_reader_view():
         _, first_id, _ = _seed(app)
         body = app.test_client().get("/").data.decode("utf-8")
         assert f"/article/{first_id}" in body, "首页标题没有链到阅读视图"
-        assert "document.title" in body, "没有把未读数同步到标签页标题"
+        js = open(os.path.join(REPO, "app", "static", "app.js"), encoding="utf-8").read()
+        assert "document.title" in js, "没有把未读数同步到标签页标题"
     finally:
         env.close()
 

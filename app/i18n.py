@@ -157,6 +157,18 @@ TRANSLATIONS = {
         "reading_view": "Reading view",
         "skip_to_content": "Skip to content",
         "load_more": "Load more",
+        # v2.0.9：视图、批量操作与外观
+        "views": "Views",
+        "view_today": "Today",
+        "selected": "selected",
+        "select_all": "Select all",
+        "select_article": "Select article",
+        "delete_article": "Delete",
+        "msg_article_deleted": "Article deleted.",
+        "density_toggle": "Toggle density",
+        "shortcuts_hint": "j / k navigate · ? shortcuts",
+
+        "load_more": "Load more",
         # v2.0.7：统计、高亮与命令面板
         "stats_title": "Statistics",
         "stats_articles": "Articles",
@@ -328,6 +340,18 @@ TRANSLATIONS = {
         "all_categories": "全部分类",
         "reading_view": "阅读视图",
         "skip_to_content": "跳到正文",
+        "load_more": "加载更多",
+        # v2.0.9：视图、批量操作与外观
+        "views": "视图",
+        "view_today": "今天",
+        "selected": "已选择",
+        "select_all": "全选",
+        "select_article": "选择这篇文章",
+        "delete_article": "删除",
+        "msg_article_deleted": "文章已删除。",
+        "density_toggle": "切换密度",
+        "shortcuts_hint": "j / k 切换 · ? 快捷键",
+
         "load_more": "加载更多",
         # v2.0.7：统计、高亮与命令面板
         "stats_title": "统计",

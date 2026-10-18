@@ -257,16 +257,18 @@ def test_add_source_falls_back_to_sync_when_tasks_full():
 # --------------------------------------------------------------------------- #
 @test
 def test_index_page_has_polling_hook():
-    """页面要有轮询容器、接口地址与定时器，否则功能等于没做。"""
+    """页面要有轮询容器与接口地址；定时逻辑在 app.js 里。"""
     env = make_env()
     try:
         app = env.app()
         body = app.test_client().get("/").data.decode("utf-8")
         assert 'id="task-status"' in body, "缺少任务状态容器"
         assert "/api/status" in body, "缺少轮询接口地址"
-        assert "setInterval" in body, "缺少定时轮询"
         assert 'id="unread-total"' in body, "未读数没有可更新的元素"
-        assert "location.reload" in body, "抓取完成后不会自动刷新"
+        assert "app.js" in body, "没有加载交互脚本"
+        js = open(os.path.join(REPO, "app", "static", "app.js"), encoding="utf-8").read()
+        assert "setInterval" in js, "app.js 缺少定时轮询"
+        assert "location.reload" in js or "render(" in js, "抓取完成后不会自动刷新"
     finally:
         env.close()
 

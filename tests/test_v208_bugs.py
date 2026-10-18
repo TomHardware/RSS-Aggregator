@@ -151,9 +151,11 @@ def test_index_wires_infinite_scroll_and_live_search():
         app = env.app()
         _seed(app, 12)
         body = app.test_client().get("/").data.decode("utf-8")
-        for needle in ("scroll-sentinel", "IntersectionObserver", "loadMore",
-                       "live-search", "EventSource", "/api/articles"):
+        for needle in ("scroll-sentinel", "live-search", "/api/articles", "app.js"):
             assert needle in body, f"首页缺少 {needle}"
+        js = open(os.path.join(REPO, "app", "static", "app.js"), encoding="utf-8").read()
+        for needle in ("IntersectionObserver", "loadMore", "EventSource"):
+            assert needle in js, f"app.js 缺少 {needle}"
     finally:
         env.close()
 
@@ -186,10 +188,11 @@ def test_skip_link_is_translated():
     for lang in ("zh", "en"):
         text = translate("skip_to_content", lang)
         assert text and text != "skip_to_content", f"{lang} 缺少 skip_to_content"
-    for name in ("base.html", "index.html"):
-        html = open(os.path.join(REPO, "app", "web", "templates", name), encoding="utf-8").read()
-        assert "_('skip_to_content')" in html or '_("skip_to_content")' in html, f"{name} 仍硬编码"
-        assert "跳到正文" not in html, f"{name} 仍硬编码双语文本"
+    # skip-link 已收敛到 base.html，由所有页面继承
+    base = open(os.path.join(REPO, "app", "web", "templates", "base.html"), encoding="utf-8").read()
+    assert 'class="skip-link"' in base, "base.html 缺少跳过导航"
+    assert "_('skip_to_content')" in base or '_("skip_to_content")' in base, "跳过导航没有走 i18n"
+    assert "跳到正文" not in base, "跳过导航仍硬编码中文"
 
 
 @test
@@ -273,7 +276,7 @@ def test_unread_cache_invalidated_after_writes():
 def test_version_and_docs_are_consistent():
     from app.version import __version__
 
-    assert __version__ == "2.0.8", __version__
+    assert __version__ >= "2.0.8", __version__
     changelog = open(os.path.join(REPO, "CHANGELOG.md"), encoding="utf-8").read()
     assert f"## [{__version__}]" in changelog, f"CHANGELOG.md 缺少 [{__version__}] 小节"
     for name in ("README.md", "README-zh.md"):

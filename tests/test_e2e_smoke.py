@@ -7,6 +7,7 @@
 用法：python tests/test_e2e_smoke.py
 """
 import os
+import re
 import json
 import subprocess
 import sys
@@ -152,6 +153,13 @@ def post_form(path, fields, timeout=30):
     )
 
 
+def _strip_tags(html):
+    """剥掉 HTML 标签，便于对渲染后的正文做文本断言。"""
+    import re as _re
+
+    return _re.sub(r"<[^>]+>", "", html)
+
+
 def main():
     workdir = tempfile.mkdtemp(prefix="rssagg-smoke-")
     db_path = os.path.join(workdir, "smoke.db").replace("\\", "/")
@@ -213,11 +221,17 @@ def main():
         check("后台首次抓取结果最终入库并渲染", fetched, "25 秒内没有抓到文章")
 
         # 任务状态接口：前端轮询依赖它，必须在真实服务器上可用
-        status, body = http("GET", "/api/status")
-        try:
-            payload = json.loads(body)
-        except ValueError:
-            payload = {}
+        # 后台任务的 finish 发生在文章入库之后，这里短暂轮询避免偶发时序竞争
+        payload = {}
+        for _attempt in range(20):
+            status, body = http("GET", "/api/status")
+            try:
+                payload = json.loads(body)
+            except ValueError:
+                payload = {}
+            if payload.get("recent"):
+                break
+            time.sleep(0.2)
         check("GET /api/status 返回 JSON", status == 200 and isinstance(payload, dict), f"status={status}")
         check("接口带版本号", bool(payload.get("version")), payload.get("version"))
         recent = payload.get("recent") or []
@@ -242,9 +256,11 @@ def main():
         check("未知任务返回 404", status == 404, f"status={status}")
 
         status, body = http("GET", "/search?q=Article+Two")
-        check("搜索命中", status == 200 and "Smoke Article Two" in body, f"status={status}")
+        _plain = _strip_tags(body)
+        check("搜索命中", status == 200 and "Smoke Article Two" in _plain, f"status={status}")
         status, body = http("GET", "/search?q=Article+Two&unread=true")
-        check("未读过滤可用", status == 200 and "Smoke Article Two" in body)
+        _plain = _strip_tags(body)
+        check("未读过滤可用", status == 200 and "Smoke Article Two" in _plain)
 
         status, body = http("GET", "/export_opml")
         ok_export = False
@@ -288,9 +304,10 @@ def main():
             "标记已读后仍出现在未读列表（注意搜索框会回显查询串，断言要用完整标题）",
         )
         status, still = http("GET", "/search?q=Smoke+Article")
+        still_plain = re.sub(r'<[^>]+>', '', still)
         check(
             "文章并未被删除",
-            "Smoke Article One" in still and "Smoke Article Two" in still,
+            "Smoke Article One" in still_plain and "Smoke Article Two" in still_plain,
             "标记已读不应删除文章",
         )
 

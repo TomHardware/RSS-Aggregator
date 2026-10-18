@@ -183,9 +183,11 @@ def test_index_has_command_palette():
         app = env.app()
         _seed(app)
         body = app.test_client().get("/").data.decode("utf-8")
-        for needle in ("palette-mask", "palette-input", "palette-list", "Ctrl", "ArrowDown", "Escape"):
+        for needle in ("palette-mask", "palette-input", "palette-list", "data-open-palette"):
             assert needle in body, f"命令面板缺少 {needle}"
-        assert "stats_page" not in body or "/stats" in body, "面板里没有统计页入口"
+        js = open(os.path.join(REPO, "app", "static", "app.js"), encoding="utf-8").read()
+        for needle in ("Ctrl", "ArrowDown", "Escape", "palette"):
+            assert needle in js, f"app.js 缺少 {needle}"
     finally:
         env.close()
 

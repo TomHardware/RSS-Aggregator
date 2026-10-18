@@ -1,627 +1,128 @@
-<!DOCTYPE html>
-<html lang="{{ lang }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
-    <title>{{ app_name }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
-    <!-- 主题脚本必须同步执行：否则深色模式下会闪一帧白底 -->
-    <script src="{{ url_for('static', filename='theme.js') }}"></script>
-</head>
-<body>
-    <a class="skip-link" href="#main">{{ _('skip_to_content') }}</a>
+{% extends "base.html" %}
+{% block title %}{{ _('console_home') }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ current_view_label or _('console_home') }}{% endblock %}
+{% block content %}
+<section class="card">
+    <form action="{{ url_for('web.search') }}" method="get" class="row" style="position:relative">
+        <input type="search" name="q" placeholder="{{ _('search') }}" value="{{ search_query|default('') }}"
+               maxlength="200" style="flex:1 1 240px" autocomplete="off">
+        <select name="source_id" aria-label="{{ _('sources') }}">
+            <option value="">{{ _('all_sources') }}</option>
+            {% for source in sources %}
+                <option value="{{ source.id }}" {% if search_source_id == source.id %}selected{% endif %}>{{ source.name }}</option>
+            {% endfor %}
+        </select>
+        <label class="row" style="gap:4px">
+            <input type="checkbox" name="unread" value="true" {% if search_unread %}checked{% endif %}>
+            {{ _('unread_only') }}
+        </label>
+        <label class="row" style="gap:4px">
+            <input type="checkbox" name="bookmarked" value="true" {% if search_bookmarked %}checked{% endif %}>
+            {{ _('gui_bookmarked_only') }}
+        </label>
+        <button type="submit" class="btn btn-primary">{{ _('search') }}</button>
+        <a class="btn" href="{{ url_for('web.index') }}">{{ _('gui_clear') }}</a>
+        <div class="live-search" hidden></div>
+    </form>
 
-    <header class="app-header">
-        <h1>{{ app_name }}</h1>
-        <span class="stat">
-            <strong id="unread-total">{{ total_unread }}</strong> {{ _('unread_counter') }}
-        </span>
-        <span class="stat">{{ _('console_counts', sources=sources|length, articles=article_count|default(0)) }}</span>
-
+    <div class="row" style="margin-top:10px">
+        <span class="pill">{{ _('export_articles') }}</span>
+        <a class="btn" href="{{ url_for('web.export_articles', fmt='json', **export_filters) }}">JSON</a>
+        <a class="btn" href="{{ url_for('web.export_articles', fmt='csv', **export_filters) }}">CSV</a>
+        <a class="btn" href="{{ url_for('web.export_articles', fmt='markdown', **export_filters) }}">Markdown</a>
+        <a class="btn" href="{{ url_for('web.export_opml_route') }}">OPML</a>
         <span class="spacer"></span>
+        <form action="{{ url_for('web.mark_all_read') }}" method="post" style="display:inline">
+            <button type="submit" class="btn">{{ _('mark_all_read') }}</button>
+        </form>
+        <button type="button" class="btn" data-open-palette>⌘K</button>
+    </div>
 
-        <nav class="app-nav">
-            <a class="btn" href="{{ url_for('web.index') }}">{{ _('console_home') }}</a>
-            <a class="btn" href="{{ url_for('web.bookmarks') }}">★ {{ _('bookmarks') }}</a>
-            <a class="btn" href="{{ url_for('web.console') }}">{{ _('console_title') }}</a>
-        </nav>
-        <button type="button" id="theme-toggle" class="btn btn-icon" aria-label="{{ _('theme_toggle') }}">☾</button>
-        {% if auth_enabled %}
-            <form action="{{ url_for('web.logout') }}" method="post" style="display:inline">
-                <button type="submit" class="btn">{{ _('logout') }}</button>
-            </form>
+    {% if categories %}
+    <div class="row" style="margin-top:10px">
+        <span class="pill">{{ _('category') }}</span>
+        <a class="btn {% if not search_category %}btn-primary{% endif %}"
+           href="{{ url_for('web.search', **dict(request.args.to_dict(), category=None, page=None)) }}">{{ _('all_categories') }}</a>
+        {% for item in categories %}
+            <a class="btn {% if search_category == item.name %}btn-primary{% endif %}"
+               href="{{ url_for('web.search', **dict(request.args.to_dict(), category=item.name, page=None)) }}">{{ item.name }} <span class="pill">{{ item.count }}</span></a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+
+<!-- 批量操作条：有勾选时出现 -->
+<div id="batch-bar" class="batch-bar" data-endpoint="{{ url_for('web.api_batch') }}">
+    <strong><span data-batch-count>0</span></strong>
+    <span class="pill">{{ _('selected') }}</span>
+    <button type="button" class="btn" data-batch-action="read" data-done-label="{{ _('mark_read') }}">{{ _('mark_read') }}</button>
+    <button type="button" class="btn" data-batch-action="unread" data-done-label="{{ _('mark_unread') }}">{{ _('mark_unread') }}</button>
+    <button type="button" class="btn" data-batch-action="bookmark" data-done-label="{{ _('mark_bookmark') }}">{{ _('mark_bookmark') }}</button>
+    <button type="button" class="btn" data-batch-action="unbookmark" data-done-label="{{ _('unmark_bookmark') }}">{{ _('unmark_bookmark') }}</button>
+    <button type="button" class="btn btn-danger" data-batch-action="delete" data-done-label="{{ _('delete_article') }}">{{ _('delete_article') }}</button>
+    <span class="spacer"></span>
+    <label class="row" style="gap:5px">
+        <input type="checkbox" id="select-all" class="select-box">
+        <small>{{ _('select_all') }}</small>
+    </label>
+</div>
+
+<section class="card" style="padding:0">
+    <div class="row" style="padding:10px 14px;border-bottom:1px solid var(--border)">
+        <h2 style="margin:0">{{ _('articles') }} <span class="pill">{{ articles.total }}</span></h2>
+        <span class="spacer"></span>
+        <small style="color:var(--text-3)">{{ _('shortcuts_hint') }}</small>
+    </div>
+
+    <div class="list" id="article-list">
+        {% if articles.items %}
+            {% set items = articles.items %}
+            {% include "_cards.html" %}
+        {% else %}
+            <p class="empty"><span class="glyph">🗒️</span>{{ _('no_articles') }}</p>
         {% endif %}
-    </header>
-
-    <!-- 轮询：显示后台抓取进展，抓完自动刷新 -->
-    <div id="task-status" class="task-status" data-endpoint="{{ url_for('web.api_status') }}" role="status" aria-live="polite"></div>
-    <div class="progress" id="task-progress" hidden><span></span></div>
-
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <ul class="flashes">
-          {% for message in messages %}<li>{{ message }}</li>{% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
-
-    <main id="main">
-        <!-- 搜索与过滤 -->
-        <section class="card">
-            <form action="{{ url_for('web.search') }}" method="get" class="row">
-                <input type="search" name="q" placeholder="{{ _('search') }}" value="{{ search_query|default('') }}"
-                       maxlength="200" style="flex:1 1 220px">
-                <select name="source_id">
-                    <option value="">{{ _('all_sources') }}</option>
-                    {% for source in sources %}
-                        <option value="{{ source.id }}" {% if search_source_id == source.id %}selected{% endif %}>{{ source.name }}</option>
-                    {% endfor %}
-                </select>
-                <label class="row" style="gap:4px">
-                    <input type="checkbox" name="unread" value="true" {% if search_unread %}checked{% endif %}>
-                    {{ _('unread_only') }}
-                </label>
-                <label class="row" style="gap:4px">
-                    <input type="checkbox" name="bookmarked" value="true" {% if search_bookmarked %}checked{% endif %}>
-                    {{ _('gui_bookmarked_only') }}
-                </label>
-                <button type="submit" class="btn-primary">{{ _('search') }}</button>
-                <a class="btn" href="{{ url_for('web.index') }}">{{ _('gui_clear') }}</a>
-            </form>
-            <div class="row" style="margin-top:10px">
-                <span class="pill">{{ _('export_articles') }}</span>
-                <a class="btn" href="{{ url_for('web.export_articles', fmt='json', **export_filters) }}">JSON</a>
-                <a class="btn" href="{{ url_for('web.export_articles', fmt='csv', **export_filters) }}">CSV</a>
-                <a class="btn" href="{{ url_for('web.export_articles', fmt='markdown', **export_filters) }}">Markdown</a>
-                <a class="btn" href="{{ url_for('web.export_opml_route') }}">OPML</a>
-                <span class="spacer" style="flex:1"></span>
-                <form action="{{ url_for('web.mark_all_read') }}" method="post" style="display:inline">
-                    <button type="submit" class="btn">{{ _('mark_all_read') }}</button>
-                </form>
-            </div>
-            {% if categories %}
-            <div class="row" style="margin-top:10px">
-                <span class="pill">{{ _('category') }}</span>
-                <a class="btn {% if not search_category %}btn-primary{% endif %}"
-                   href="{{ url_for('web.search', **dict(request.args.to_dict(), category=None, page=None)) }}">{{ _('all_categories') }}</a>
-                {% for item in categories %}
-                    <a class="btn {% if search_category == item.name %}btn-primary{% endif %}"
-                       href="{{ url_for('web.search', **dict(request.args.to_dict(), category=item.name, page=None)) }}">{{ item.name }} <span class="pill">{{ item.count }}</span></a>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </section>
-
-        <!-- 添加订阅源 -->
-        <section class="card">
-            <h2>{{ _('gui_add_feed') }}</h2>
-            <form action="{{ url_for('web.add_source') }}" method="post" class="row">
-                <input type="text" name="name" placeholder="{{ _('name') }}" maxlength="200" style="flex:1 1 140px">
-                <input type="url" name="url" placeholder="RSS URL" required maxlength="500" style="flex:2 1 240px">
-                <input type="text" name="category" placeholder="{{ _('category') }}" maxlength="100" style="flex:1 1 110px">
-                <input type="number" name="interval" value="30" min="5" max="10080" title="{{ _('interval') }}" style="width:90px">
-                <button type="submit" class="btn-primary">{{ _('add_source') }}</button>
-            </form>
-            <form action="{{ url_for('web.import_opml_route') }}" method="post" enctype="multipart/form-data" class="row" style="margin-top:10px">
-                <input type="file" name="opml_file" accept=".opml,.xml" required>
-                <button type="submit">{{ _('import_opml') }}</button>
-            </form>
-        </section>
-
-        <div class="grid">
-            <!-- 订阅源列表 -->
-            <section class="card">
-                <h2>{{ _('sources') }}</h2>
-                {% if sources %}
-                <div class="table-scroll">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>{{ _('name') }}</th>
-                            <th>{{ _('category') }}</th>
-                            <th>{{ _('interval') }}</th>
-                            <th>{{ _('unread_counter') }}</th>
-                            <th>{{ _('console_actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for source in sources %}
-                        <tr>
-                            <td>
-                                <a href="{{ url_for('web.search', source_id=source.id) }}">{{ source.name }}</a>
-                                {% if not source.enabled %}<span class="pill pill-warn">{{ _('paused') }}</span>{% endif %}
-                                <br><small style="color:var(--text-dim)">{{ source.url }}</small>
-                                <details>
-                                    <summary style="cursor:pointer;color:var(--text-dim);font-size:12.5px">{{ _('edit_source') }}</summary>
-                                    <form action="{{ url_for('web.edit_source', source_id=source.id) }}" method="post" class="row" style="margin-top:6px">
-                                        <input type="text" name="name" value="{{ source.name }}" maxlength="200" style="width:150px" aria-label="{{ _('name') }}">
-                                        <input type="text" name="category" value="{{ source.category }}" maxlength="100" style="width:110px" aria-label="{{ _('category') }}">
-                                        <input type="number" name="interval" value="{{ source.interval }}" min="5" max="10080" style="width:80px" aria-label="{{ _('interval') }}">
-                                        <button type="submit">{{ _('save') }}</button>
-                                    </form>
-                                </details>
-                            </td>
-                            <td>{{ source.category }}</td>
-                            <td>{{ source.interval }} min</td>
-                            <td>
-                                {% set count = unread_counts.get(source.id, 0) %}
-                                {% if count %}<span class="pill pill-unread">{{ count }}</span>{% else %}<span class="pill">0</span>{% endif %}
-                            </td>
-                            <td>
-                                <form action="{{ url_for('web.refresh_source', source_id=source.id) }}" method="post" style="display:inline">
-                                    <button type="submit" class="btn">{{ _('refresh') }}</button>
-                                </form>
-                                <form action="{{ url_for('web.toggle_source', source_id=source.id) }}" method="post" style="display:inline">
-                                    <button type="submit" class="btn">{{ _('resume') if not source.enabled else _('pause') }}</button>
-                                </form>
-                                <form action="{{ url_for('web.delete_source', source_id=source.id) }}" method="post" style="display:inline"
-                                      onsubmit="return confirm('{{ _('delete_confirm') }}')">
-                                    <button type="submit" class="btn btn-danger">{{ _('delete_source') }}</button>
-                                </form>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-                </div>
-                {% else %}
-                    <p>{{ _('console_no_feeds') }}</p>
-                {% endif %}
-            </section>
-
-            <!-- 文章列表 -->
-            <section class="card">
-                <h2>{{ _('articles') }} ({{ articles.total }})</h2>
-                {% if articles.items %}
-                    {% set items = articles.items %}
-                    {% include "_cards.html" %}
-                    <div id="scroll-sentinel" class="scroll-sentinel"
-                         data-api="{{ url_for('web.api_articles') }}"
-                         data-page="{{ articles.page }}"
-                         data-has-next="{{ '1' if articles.has_next else '0' }}"
-                         data-filters="{{ request.query_string.decode('utf-8') }}">
-                        {% if articles.has_next %}
-                            <a class="btn" href="{{ page_url(articles.next_num) }}">{{ _('load_more') }}</a>
-                        {% endif %}
-                    </div>
-
-                    {% if articles.pages > 1 %}
-                    <nav class="row" style="margin-top:12px" aria-label="pagination">
-                        {% if articles.has_prev %}<a class="btn" href="{{ page_url(articles.prev_num) }}">← {{ _('previous') }}</a>{% endif %}
-                        <span class="pill">{{ articles.page }} / {{ articles.pages }}</span>
-                        {% if articles.has_next %}<a class="btn" href="{{ page_url(articles.next_num) }}">{{ _('next') }} →</a>{% endif %}
-                    </nav>
-                    {% endif %}
-                {% else %}
-                    <p class="empty"><span class="glyph">🗒️</span>{{ _('no_articles') }}</p>
-                {% endif %}
-            </section>
-        </div>
-    </main>
-
-    <div id="shortcut-help" class="card shortcut-help" hidden>
-        <h2>{{ _('shortcuts') }}</h2>
-        <p><kbd>j</kbd> / <kbd>k</kbd> {{ _('shortcut_next_prev') }}</p>
-        <p><kbd>o</kbd> {{ _('shortcut_open') }} · <kbd>s</kbd> {{ _('mark_bookmark') }} · <kbd>m</kbd> {{ _('mark_read') }}</p>
-        <p><kbd>/</kbd> {{ _('shortcut_search') }} · <kbd>?</kbd> {{ _('shortcuts') }}</p>
-        <p><kbd>Ctrl</kbd> + <kbd>k</kbd> {{ _('shortcut_palette') }}</p>
     </div>
 
-    <footer class="app-footer">
-        {{ app_name }} {{ app_version }}
-    </footer>
-
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-    <!-- 命令面板（Ctrl+K）：键盘优先的快速跳转 -->
-    <div id="palette-mask" class="palette-mask" hidden>
-        <div class="palette" role="dialog" aria-modal="true" aria-label="{{ _('command_palette') }}">
-            <input type="text" id="palette-input" placeholder="{{ _('palette_placeholder') }}"
-                   autocomplete="off" spellcheck="false" aria-controls="palette-list">
-            <ul id="palette-list" role="listbox"></ul>
-            <div style="padding:8px 14px;color:var(--text-dim);font-size:12px">{{ _('palette_hint') }}</div>
-        </div>
+    <div id="scroll-sentinel" class="scroll-sentinel"
+         data-api="{{ url_for('web.api_articles') }}"
+         data-page="{{ articles.page }}"
+         data-has-next="{{ '1' if articles.has_next else '0' }}"
+         data-filters="{{ request.query_string.decode('utf-8') }}">
+        {% if articles.has_next %}
+            <a class="btn" href="{{ page_url(articles.next_num) }}" data-load-more>{{ _('load_more') }}</a>
+        {% endif %}
     </div>
 
-    <script>
-    // 键盘快捷键（无障碍的多模态交互：鼠标、键盘都能完成常用操作）
-    (function () {
-        const articles = Array.from(document.querySelectorAll('article.article'));
-        let cursor = -1;
+    {% if articles.pages > 1 %}
+    <nav class="pager" aria-label="pagination">
+        {% if articles.has_prev %}<a class="btn" href="{{ page_url(articles.prev_num) }}">← {{ _('previous') }}</a>{% endif %}
+        <span class="pill">{{ articles.page }} / {{ articles.pages }}</span>
+        {% if articles.has_next %}<a class="btn" href="{{ page_url(articles.next_num) }}">{{ _('next') }} →</a>{% endif %}
+    </nav>
+    {% endif %}
+</section>
 
-        function focusArticle(index) {
-            if (!articles.length) return;
-            cursor = Math.max(0, Math.min(articles.length - 1, index));
-            articles.forEach(item => item.classList.remove('is-cursor'));
-            const target = articles[cursor];
-            target.classList.add('is-cursor');
-            target.scrollIntoView({block: 'center', behavior: 'smooth'});
-        }
+<div id="shortcut-help" class="card shortcut-help" hidden>
+    <h2>{{ _('shortcuts') }}</h2>
+    <p><kbd>j</kbd> / <kbd>k</kbd> {{ _('shortcut_next_prev') }}</p>
+    <p><kbd>o</kbd> {{ _('shortcut_open') }} · <kbd>s</kbd> {{ _('mark_bookmark') }} · <kbd>m</kbd> {{ _('mark_read') }}</p>
+    <p><kbd>/</kbd> {{ _('shortcut_search') }} · <kbd>?</kbd> {{ _('shortcuts') }}</p>
+    <p><kbd>Ctrl</kbd> + <kbd>k</kbd> {{ _('shortcut_palette') }}</p>
+</div>
 
-        function current() {
-            return cursor >= 0 ? articles[cursor] : null;
-        }
-
-        document.addEventListener('keydown', function (event) {
-            if (event.target.matches('input, textarea, select')) return;
-            const key = event.key;
-            if (key === 'j') { focusArticle(cursor + 1); }
-            else if (key === 'k') { focusArticle(cursor - 1); }
-            else if (key === 'o' && current()) {
-                const link = current().querySelector('h3 a');
-                if (link) window.location = link.href;
-            }
-            else if (key === 's' && current()) {
-                const star = current().querySelector('.bookmark-toggle');
-                if (star) star.click();
-            }
-            else if (key === 'm' && current()) {
-                const form = current().querySelector('form[action*="/read"]');
-                if (form) form.submit();
-            }
-            else if (key === '/') {
-                event.preventDefault();
-                const search = document.querySelector('input[type=search]');
-                if (search) search.focus();
-            }
-            else if (key === '?') {
-                const help = document.getElementById('shortcut-help');
-                if (help) help.hidden = !help.hidden;
-            }
-        });
-    })();
-
-    // 命令面板：Ctrl/Cmd+K 唤起，输入即筛选，回车跳转
-    (function () {
-        const mask = document.getElementById('palette-mask');
-        const input = document.getElementById('palette-input');
-        const list = document.getElementById('palette-list');
-        if (!mask || !input || !list) return;
-
-        const items = [];
-        items.push({label: '{{ _("console_home") }}', hint: '{{ _("palette_pages") }}', href: '{{ url_for("web.index") }}'});
-        items.push({label: '{{ _("console_title") }}', hint: '{{ _("palette_pages") }}', href: '{{ url_for("web.console") }}'});
-        items.push({label: '{{ _("stats_title") }}', hint: '{{ _("palette_pages") }}', href: '{{ url_for("web.stats_page") }}'});
-        items.push({label: '{{ _("bookmarks") }}', hint: '{{ _("palette_pages") }}', href: '{{ url_for("web.bookmarks") }}'});
-        {% for article in articles.items %}
-        items.push({
-            label: {{ article.title|tojson }},
-            hint: '{{ _("palette_articles") }}',
-            href: '{{ url_for("web.article_detail", article_id=article.id) }}'
-        });
-        {% endfor %}
-        {% for source in sources %}
-        items.push({
-            label: {{ source.name|tojson }},
-            hint: '{{ _("sources") }}',
-            href: '{{ url_for("web.search", source_id=source.id) }}'
-        });
-        {% endfor %}
-
-        let matches = items.slice(0, 12);
-        let active = 0;
-
-        function render() {
-            list.innerHTML = '';
-            if (!matches.length) {
-                const li = document.createElement('li');
-                li.textContent = '{{ _("palette_no_match") }}';
-                li.setAttribute('aria-disabled', 'true');
-                list.appendChild(li);
-                return;
-            }
-            matches.forEach(function (item, index) {
-                const li = document.createElement('li');
-                li.setAttribute('role', 'option');
-                li.setAttribute('aria-selected', index === active ? 'true' : 'false');
-                li.textContent = item.label;
-                const hint = document.createElement('span');
-                hint.className = 'hint';
-                hint.textContent = item.hint;
-                li.appendChild(hint);
-                li.addEventListener('click', function () { window.location = item.href; });
-                list.appendChild(li);
-            });
-        }
-
-        function filter() {
-            const query = input.value.trim().toLowerCase();
-            matches = (query
-                ? items.filter(function (item) { return item.label.toLowerCase().includes(query); })
-                : items).slice(0, 30);
-            active = 0;
-            render();
-        }
-
-        function open() {
-            mask.hidden = false;
-            input.value = '';
-            filter();
-            input.focus();
-        }
-
-        function close() { mask.hidden = true; }
-
-        document.addEventListener('keydown', function (event) {
-            const isOpen = !mask.hidden;
-            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-                event.preventDefault();
-                isOpen ? close() : open();
-                return;
-            }
-            if (!isOpen) return;
-            if (event.key === 'Escape') { close(); }
-            else if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                active = Math.min(active + 1, matches.length - 1);
-                render();
-            } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                active = Math.max(active - 1, 0);
-                render();
-            } else if (event.key === 'Enter' && matches[active]) {
-                window.location = matches[active].href;
-            }
-        });
-
-        input.addEventListener('input', filter);
-        mask.addEventListener('click', function (event) {
-            if (event.target === mask) close();
-        });
-    })();
-
-    // ---------------------------------------------------------------------
-    // v2.0.8：无限滚动、即时搜索与 SSE 实时状态
-    // ---------------------------------------------------------------------
-    (function () {
-        const sentinel = document.getElementById('scroll-sentinel');
-        const list = document.querySelector('main');
-
-        // 无限滚动：接近底部时拉取下一页片段并追加（服务端渲染，样式一致）
-        if (sentinel && window.IntersectionObserver) {
-            let page = parseInt(sentinel.dataset.page || '1', 10);
-            let loading = false;
-            let hasNext = sentinel.dataset.hasNext === '1';
-
-            async function loadMore() {
-                if (loading || !hasNext) return;
-                loading = true;
-                sentinel.classList.add('is-loading');
-                try {
-                    const params = new URLSearchParams(sentinel.dataset.filters || '');
-                    params.set('page', String(page + 1));
-                    params.set('html', '1');
-                    const resp = await fetch(sentinel.dataset.api + '?' + params.toString(), {
-                        headers: {'Accept': 'text/html'}, credentials: 'same-origin',
-                    });
-                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                    const markup = await resp.text();
-                    if (!markup.trim()) { hasNext = false; return; }
-                    sentinel.insertAdjacentHTML('beforebegin', markup);
-                    page += 1;
-                    hasNext = markup.includes('article-');
-                    sentinel.dataset.page = String(page);
-                } catch (err) {
-                    hasNext = false;  // 出错就停止自动加载，避免死循环
-                } finally {
-                    loading = false;
-                    sentinel.classList.remove('is-loading');
-                }
-            }
-
-            const observer = new IntersectionObserver(function (entries) {
-                if (entries.some(entry => entry.isIntersecting)) loadMore();
-            }, {rootMargin: '400px'});
-            observer.observe(sentinel);
-        }
-
-        // 即时搜索：输入 250ms 后请求片段，显示下拉结果
-        const searchInput = document.querySelector('input[type=search]');
-        if (searchInput) {
-            const box = document.createElement('div');
-            box.className = 'live-search';
-            box.hidden = true;
-            searchInput.parentNode.style.position = 'relative';
-            searchInput.parentNode.appendChild(box);
-
-            let timer = null;
-            let seq = 0;
-
-            function close() { box.hidden = true; box.innerHTML = ''; }
-
-            async function query(value) {
-                const mine = ++seq;
-                const params = new URLSearchParams({q: value, limit: '6'});
-                try {
-                    const resp = await fetch(sentinel.dataset.api + '?' + params.toString(), {
-                        headers: {'Accept': 'application/json'}, credentials: 'same-origin',
-                    });
-                    if (!resp.ok) return;
-                    const data = await resp.json();
-                    if (mine !== seq) return;   // 丢弃过期响应，避免结果闪回
-                    if (!data.items || !data.items.length) { close(); return; }
-                    box.innerHTML = '';
-                    data.items.forEach(function (item) {
-                        const row = document.createElement('a');
-                        row.className = 'live-row';
-                        row.href = '/article/' + item.id;
-                        const title = document.createElement('span');
-                        title.textContent = item.title || '(untitled)';
-                        const meta = document.createElement('small');
-                        meta.textContent = (item.published || '').slice(0, 10);
-                        row.appendChild(title);
-                        row.appendChild(meta);
-                        box.appendChild(row);
-                    });
-                    box.hidden = false;
-                } catch (err) { /* 网络抖动忽略 */ }
-            }
-
-            searchInput.addEventListener('input', function () {
-                const value = searchInput.value.trim();
-                if (timer) clearTimeout(timer);
-                if (value.length < 2) { close(); return; }
-                timer = setTimeout(function () { query(value); }, 250);
-            });
-            searchInput.addEventListener('keydown', function (event) {
-                if (event.key === 'Escape') close();
-            });
-            document.addEventListener('click', function (event) {
-                if (!box.contains(event.target) && event.target !== searchInput) close();
-            });
-        }
-
-        // SSE：实时接收任务与未读数；断线自动退回轮询（page 已有轮询逻辑）
-        if (window.EventSource) {
-            const dot = document.createElement('span');
-            dot.className = 'live-dot';
-            dot.title = 'live';
-            const header = document.querySelector('header.app-header');
-            if (header) header.appendChild(dot);
-
-            let source = null;
-            let retries = 0;
-
-            function connect() {
-                source = new EventSource('/api/events');
-                source.onopen = function () { dot.classList.add('is-on'); retries = 0; };
-                source.onmessage = function (event) {
-                    let data;
-                    try { data = JSON.parse(event.data); } catch (e) { return; }
-                    const counter = document.getElementById('unread-total');
-                    if (counter && typeof data.unread_total === 'number') {
-                        counter.textContent = data.unread_total;
-                    }
-                    const box = document.getElementById('task-status');
-                    if (box && data.running && data.running.length) {
-                        box.textContent = data.running.map(function (task) {
-                            return task.source_name || ('#' + task.source_id);
-                        }).join(' · ');
-                        box.classList.add('is-active');
-                    } else if (box) {
-                        box.classList.remove('is-active');
-                    }
-                };
-                source.onerror = function () {
-                    dot.classList.remove('is-on');
-                    source.close();
-                    if (retries++ < 5) setTimeout(connect, 2000 * retries);
-                };
-            }
-            connect();
-        }
-    })();
-
-    // Toast：收藏等轻量操作给出即时反馈，不打断当前页面
-    function notify(text) {
-        const toast = document.getElementById('toast');
-        if (!toast) return;
-        toast.textContent = text;
-        toast.classList.add('is-visible');
-        setTimeout(function () { toast.classList.remove('is-visible'); }, 1800);
-    }
-
-    // 任务状态轮询：显示抓取进展，抓取结束后自动刷新页面。
-    (function () {
-        const box = document.getElementById('task-status');
-        const bar = document.getElementById('task-progress');
-        if (!box || !window.fetch) return;
-        const endpoint = box.dataset.endpoint;
-        const L = {{ {
-            "running": _("task_running"),
-            "running_unknown": _("task_running_unknown"),
-            "done": _("task_done"),
-            "failed": _("task_failed"),
-        } | tojson }};
-        let known = new Set();
-        let primed = false;
-
-        function label(task) {
-            const name = task.source_name || ('#' + (task.source_id ?? '?'));
-            if (task.state === 'running') {
-                return name ? L.running.replace('{name}', name) : L.running_unknown;
-            }
-            if (task.state === 'success') {
-                return L.done.replace('{count}', task.new_articles).replace('{name}', name);
-            }
-            return L.failed.replace('{name}', name);
-        }
-
-        async function poll() {
-            try {
-                const resp = await fetch(endpoint, {
-                    headers: {'Accept': 'application/json'},
-                    credentials: 'same-origin',
-                    cache: 'no-store',
-                });
-                if (resp.status === 401) { window.location.reload(); return; }
-                if (!resp.ok) return;
-                const data = await resp.json();
-                const running = data.running || [];
-                const recent = data.recent || [];
-                const nowRunning = new Set(running.map(t => t.id));
-
-                if (primed && Array.from(known).some(id => !nowRunning.has(id))) {
-                    window.location.reload();
-                    return;
-                }
-                known = nowRunning;
-                primed = true;
-
-                const counter = document.getElementById('unread-total');
-                if (counter && typeof data.unread_total === 'number') {
-                    counter.textContent = data.unread_total;
-                }
-
-                if (running.length) {
-                    box.textContent = running.map(label).join(' · ');
-                    box.classList.add('is-active');
-                    if (bar) bar.hidden = false;
-                } else {
-                    box.classList.remove('is-active');
-                    if (bar) bar.hidden = true;
-                    box.textContent = recent.length ? label(recent[0]) : '';
-                }
-
-                // 未读数同步到标签页标题：切到别的标签也能看到有没有新内容
-                if (typeof data.unread_total === 'number') {
-                    const base = document.title.replace(/^\(\d+\+\)\s*/, '');
-                    document.title = data.unread_total ? `(${data.unread_total}) ${base}` : base;
-                }
-            } catch (err) {
-                /* 网络抖动忽略 */
-            }
-        }
-
-        poll();
-        setInterval(poll, 5000);
-    })();
-
-    // 收藏按钮：无刷新切换（失败时回退到整页提交）
-    document.addEventListener('click', async function (event) {
-        const button = event.target.closest('.bookmark-toggle');
-        if (!button) return;
-        event.preventDefault();
-        const wasOn = button.getAttribute('aria-pressed') === 'true';
-        button.disabled = true;
-        try {
-            const resp = await fetch(button.dataset.url, {
-                method: 'POST',
-                headers: {'Accept': 'application/json'},
-                credentials: 'same-origin',
-            });
-            if (!resp.ok) throw new Error('HTTP ' + resp.status);
-            const data = await resp.json();
-            button.textContent = data.bookmarked ? '★' : '☆';
-            button.setAttribute('aria-pressed', data.bookmarked ? 'true' : 'false');
-            notify(data.bookmarked ? '{{ _("msg_bookmark_on") }}' : '{{ _("msg_bookmark_off") }}');
-        } catch (err) {
-            button.textContent = wasOn ? '★' : '☆';
-        } finally {
-            button.disabled = false;
-        }
-    });
-    </script>
-</body>
-</html>
+<!-- 右侧快捷添加 -->
+<section class="card">
+    <h2>{{ _('gui_add_feed') }}</h2>
+    <form action="{{ url_for('web.add_source') }}" method="post" class="row">
+        <input type="text" name="name" placeholder="{{ _('name') }}" maxlength="200" style="flex:1 1 130px">
+        <input type="url" name="url" placeholder="RSS URL" required maxlength="500" style="flex:2 1 240px">
+        <input type="text" name="category" placeholder="{{ _('category') }}" maxlength="100" style="flex:1 1 100px">
+        <input type="number" name="interval" value="30" min="5" max="10080" style="width:88px" aria-label="{{ _('interval') }}">
+        <button type="submit" class="btn-primary">{{ _('add_source') }}</button>
+    </form>
+    <form action="{{ url_for('web.import_opml_route') }}" method="post" enctype="multipart/form-data" class="row" style="margin-top:10px">
+        <input type="file" name="opml_file" accept=".opml,.xml" required>
+        <button type="submit" class="btn">{{ _('import_opml') }}</button>
+    </form>
+</section>
+{% endblock %}
