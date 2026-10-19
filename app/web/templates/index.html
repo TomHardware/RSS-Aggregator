@@ -20,6 +20,14 @@
             <input type="checkbox" name="bookmarked" value="true" {% if search_bookmarked %}checked{% endif %}>
             {{ _('gui_bookmarked_only') }}
         </label>
+        <select name="sort" aria-label="{{ _('sort') }}">
+            <option value="newest" {% if search_sort == 'newest' %}selected{% endif %}>{{ _('sort_newest') }}</option>
+            <option value="oldest" {% if search_sort == 'oldest' %}selected{% endif %}>{{ _('sort_oldest') }}</option>
+            <option value="source" {% if search_sort == 'source' %}selected{% endif %}>{{ _('sort_source') }}</option>
+        </select>
+        <input type="text" name="exclude" value="{{ search_exclude|default('') }}"
+               placeholder="{{ _('exclude_placeholder') }}" aria-label="{{ _('exclude_label') }}"
+               maxlength="200" style="flex:1 1 150px">
         <button type="submit" class="btn btn-primary">{{ _('search') }}</button>
         <a class="btn" href="{{ url_for('web.index') }}">{{ _('gui_clear') }}</a>
         <div class="live-search" hidden></div>
@@ -121,7 +129,11 @@
         <button type="submit" class="btn-primary">{{ _('add_source') }}</button>
     </form>
     <form action="{{ url_for('web.import_opml_route') }}" method="post" enctype="multipart/form-data" class="row" style="margin-top:10px">
-        <input type="file" name="opml_file" accept=".opml,.xml" required>
+        <label class="file-picker">
+        <input type="file" name="opml_file" accept=".opml,.xml" required class="file-input">
+        <span class="file-button">{{ _('choose_file') }}</span>
+        <span class="file-name" data-file-name>{{ _('no_file_chosen') }}</span>
+    </label>
         <button type="submit" class="btn">{{ _('import_opml') }}</button>
     </form>
 </section>

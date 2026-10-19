@@ -36,6 +36,10 @@ def _parse_filters():
         "unread": request.args.get("unread", "false").lower() == "true",
         "bookmarked": request.args.get("bookmarked", "false").lower() == "true",
         "category": (request.args.get("category") or "").strip(),
+        "sort": (request.args.get("sort") or "newest").strip(),
+        "exclude": [item.strip() for item in
+                    (request.args.get("exclude") or "").replace("，", ",").split(",")
+                    if item.strip()],
     }
 
 
@@ -61,6 +65,7 @@ def api_articles():
         filters["q"], filters["source_id"], filters["unread"],
         page=page, per_page=limit, bookmarked_only=filters["bookmarked"],
         category=filters["category"] or None,
+        exclude=filters["exclude"], sort=filters["sort"],
     )
     items = list(pagination.items)
 

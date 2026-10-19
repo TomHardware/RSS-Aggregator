@@ -57,6 +57,15 @@
                     <a href="{{ url_for('web.console') }}">{{ _('console_title') }}</a>
                     <a href="{{ url_for('web.stats_page') }}">{{ _('stats_title') }}</a>
                 </div>
+                <div class="lang-switch" role="group" aria-label="{{ _('language') }}">
+                    <span class="lang-label">{{ _('language') }}</span>
+                    {% for code, label in (('zh', '中文'), ('en', 'English')) %}
+                        <a class="lang-option {% if lang == code %}is-active{% endif %}"
+                           href="{{ url_for('web.set_language', lang=code, next=request.full_path.rstrip('?')) }}"
+                           hreflang="{{ code }}" lang="{{ code }}"
+                           aria-current="{{ 'true' if lang == code else 'false' }}">{{ label }}</a>
+                    {% endfor %}
+                </div>
                 {% if auth_enabled|default(false) %}
                     <form action="{{ url_for('web.logout') }}" method="post">
                         <button type="submit" class="btn" style="width:100%">{{ _('logout') }}</button>
@@ -76,6 +85,9 @@
                 <span class="spacer"></span>
                 <button type="button" class="btn btn-icon" data-open-palette
                         aria-label="{{ _('command_palette') }}" title="Ctrl / ⌘ + K">⌘K</button>
+                <a class="btn btn-icon lang-topbar" href="{{ url_for('web.set_language', lang=('en' if lang == 'zh' else 'zh'), next=request.full_path.rstrip('?')) }}"
+                   title="{{ _('language') }}" aria-label="{{ _('language') }}"
+                   hreflang="{{ 'en' if lang == 'zh' else 'zh' }}">{{ 'EN' if lang == 'zh' else '中文' }}</a>
                 <button type="button" id="theme-toggle" class="btn btn-icon"
                         aria-label="{{ _('theme_toggle') }}">☾</button>
                 <span id="live-dot" class="live-dot" title="live"></span>

@@ -594,6 +594,29 @@
         });
     }
 
+
+    /* ------------------------------------------------------------------ */
+    /* 12. 文件选择器：显示所选文件名（原生控件的文案无法翻译）            */
+    /* ------------------------------------------------------------------ */
+    function initFilePickers() {
+        document.querySelectorAll('.file-picker').forEach(function (picker) {
+            var input = picker.querySelector('.file-input');
+            var label = picker.querySelector('[data-file-name]');
+            if (!input || !label) return;
+            var idle = label.textContent;
+            input.addEventListener('change', function () {
+                var file = input.files && input.files[0];
+                if (file) {
+                    label.textContent = file.name;
+                    picker.classList.add('has-file');
+                } else {
+                    label.textContent = idle;
+                    picker.classList.remove('has-file');
+                }
+            });
+        });
+    }
+
     /* ------------------------------------------------------------------ */
     /* 启动                                                                */
     /* ------------------------------------------------------------------ */
@@ -610,6 +633,7 @@
         initBatch();
         initBookmarks();
         initReader();
+        initFilePickers();
     }
 
     if (document.readyState === 'loading') {

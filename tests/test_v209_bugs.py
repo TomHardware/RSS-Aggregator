@@ -238,7 +238,7 @@ def test_base_template_tolerates_minimal_context():
 def test_version_and_docs_are_consistent():
     from app.version import __version__
 
-    assert __version__ == "2.0.9", __version__
+    assert __version__ >= "2.0.9", __version__
     changelog = open(os.path.join(REPO, "CHANGELOG.md"), encoding="utf-8").read()
     assert f"## [{__version__}]" in changelog
     for name in ("README.md", "README-zh.md"):

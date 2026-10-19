@@ -8,6 +8,50 @@
 
 ---
 
+## [2.1.0] - 2026-10-18
+
+语言与筛选版本：补回语言切换并让控件彻底本地化，新增排序与关键词屏蔽。
+Language and filtering release: the language switcher is restored with fully localised controls, plus sorting and keyword muting.
+
+### 新增功能 / Added
+
+- **语言切换按钮**：每个页面的侧栏底部都有「中文 / English」切换，当前语言高亮显示。
+- *Language switcher: every page shows a Chinese / English switch at the bottom of the sidebar with the active language highlighted.*
+- 窄屏下侧栏收起时，顶部条会保留一个语言按钮，随时可切。
+- *When the sidebar collapses on narrow screens, a language button stays in the top bar.*
+- **语言选择会被记住**：选择写入 cookie，之后访问沿用上次的语言，无需每次带参数。
+- *The choice is remembered: it is stored in a cookie, so later visits keep the last language without URL parameters.*
+- **文件上传按钮本地化**：上传控件由程序绘制，按钮文字跟随界面语言，不再出现中英文混排。
+- *Localised upload button: the upload control is drawn by the app so its label follows the interface language instead of mixing languages.*
+- 选择文件后会显示文件名，过长自动省略。
+- *The chosen file name is shown after selection, truncated when long.*
+- **排序**：列表可按最新优先、最早优先或按订阅源排序。
+- *Sorting: order the list by newest, oldest or feed.*
+- **关键词屏蔽**：填入逗号分隔的关键词即可隐藏标题命中的条目，中英文逗号都支持。
+- *Keyword muting: comma-separated keywords hide items whose titles match, with both English and Chinese commas accepted.*
+- 屏蔽可与搜索、未读、收藏、分类等条件叠加使用。
+- *Muting composes with search, unread, bookmark and category filters.*
+- 排序与屏蔽同时作用于网页列表与 `/api/articles` 接口，外部脚本行为一致。
+- *Sorting and muting apply to both the web list and the `/api/articles` endpoint, so scripts behave the same way.*
+
+### 修复 / Fixed
+
+- **找不到语言切换按钮**：v2.0.9 重写布局时把切换入口丢了，界面语言只能靠 URL 参数控制。
+- *The language switch had disappeared: the v2.0.9 layout rewrite dropped the entry point, leaving the language controllable only through URL parameters.*
+- **英文模式下「选择文件」仍是中文**：原生上传按钮的文字由浏览器/系统语言决定，页面无法控制。
+- *The upload button still showed the Chinese label in English mode: the native control's label comes from the browser and cannot be controlled by the page.*
+- **语言切换存在开放重定向风险**：切换后的跳转地址做了站内校验，不会把用户带去外站。
+- *The language switch was open to redirects: its target is now validated to stay on the same site.*
+
+### 兼容性 / Compatibility
+
+- 数据库结构不变，无需迁移。
+- *The database schema is unchanged, so no migration is needed.*
+- 未引入任何第三方依赖。
+- *No third-party dependency was added.*
+- 新增 `test_v210_bugs.py`（16 例），覆盖两个已报告的缺陷。
+- *Adds `test_v210_bugs.py` with 16 cases covering both reported bugs.*
+
 ## [2.0.9] - 2026-10-18
 
 界面重构版本：Web UI 按桌面级应用重做（侧栏工作区 + 密度 + 强调色），交互逻辑抽成单一模块，并新增批量操作。

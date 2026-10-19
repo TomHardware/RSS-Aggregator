@@ -33,7 +33,9 @@ def _like_pattern(text):
 
 
 def search_articles(query, source_id=None, unread_only=False, page=1, per_page=50,
-                    bookmarked_only=False, category=None):
+                    bookmarked_only=False, category=None, exclude=None, sort="newest",
+                    min_length=0):
+    """按标题/摘要/正文搜索，支持来源、分类、未读、收藏、关键词屏蔽、排序与长度过滤。"""
     """按标题/摘要/正文搜索，支持来源、分类、未读与收藏过滤、分页。"""
     q = Article.query
 
@@ -66,6 +68,19 @@ def search_articles(query, source_id=None, unread_only=False, page=1, per_page=5
     if bookmarked_only:
         q = q.filter(Article.bookmarked.is_(True))
 
+    # 关键词屏蔽：标题命中任一词就不展示（用于过滤噪音源）
+    for word in (exclude or []):
+        word = (word or "").strip()
+        if not word:
+            continue
+        q = q.filter(~Article.title.like(_like_pattern(word), escape=LIKE_ESCAPE))
+
+    # 摘要长度下限：过滤掉只有标题没有内容的条目
+    if min_length:
+        from sqlalchemy import func
+
+        q = q.filter(func.length(func.coalesce(Article.summary, "")) >= int(min_length))
+
     try:
         page = max(1, int(page or 1))
     except (TypeError, ValueError):
@@ -75,7 +90,14 @@ def search_articles(query, source_id=None, unread_only=False, page=1, per_page=5
     except (TypeError, ValueError):
         per_page = 50
 
+    if sort == "oldest":
+        ordering = (Article.published.asc(), Article.id.asc())
+    elif sort == "source":
+        ordering = (Article.source_id.asc(), Article.published.desc(), Article.id.desc())
+    else:
+        ordering = (Article.published.desc(), Article.id.desc())
+
     return (
-        q.order_by(Article.published.desc(), Article.id.desc())
+        q.order_by(*ordering)
         .paginate(page=page, per_page=per_page, error_out=False)
     )

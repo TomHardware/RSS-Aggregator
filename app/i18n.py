@@ -166,6 +166,18 @@ TRANSLATIONS = {
         "delete_article": "Delete",
         "msg_article_deleted": "Article deleted.",
         "density_toggle": "Toggle density",
+        "language": "Language",
+        "choose_file": "Choose file",
+        "no_file_chosen": "No file chosen",
+        "file_chosen": "Selected",
+        "sort": "Sort",
+        "sort_newest": "Newest first",
+        "sort_oldest": "Oldest first",
+        "sort_source": "By feed",
+        "exclude_label": "Hide keywords",
+        "exclude_placeholder": "e.g. giveaway, sponsored",
+
+
         "shortcuts_hint": "j / k navigate · ? shortcuts",
 
         "load_more": "Load more",
@@ -350,6 +362,18 @@ TRANSLATIONS = {
         "delete_article": "删除",
         "msg_article_deleted": "文章已删除。",
         "density_toggle": "切换密度",
+        "language": "语言",
+        "choose_file": "选择文件",
+        "no_file_chosen": "未选择文件",
+        "file_chosen": "已选择",
+        "sort": "排序",
+        "sort_newest": "最新优先",
+        "sort_oldest": "最早优先",
+        "sort_source": "按订阅源",
+        "exclude_label": "屏蔽关键词",
+        "exclude_placeholder": "如：广告，推广",
+
+
         "shortcuts_hint": "j / k 切换 · ? 快捷键",
 
         "load_more": "加载更多",

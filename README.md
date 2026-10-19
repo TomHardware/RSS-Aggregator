@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**Current version: 2.0.9** &nbsp;·&nbsp; `/healthz` reports it too.
+**Current version: 2.1.0** &nbsp;·&nbsp; `/healthz` reports it too.
 
 A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML import/export, full-text extraction, search, email notifications, and a bilingual web interface. Ideal for personal or team use in information aggregation, content monitoring, and reading management.
 
@@ -46,6 +46,10 @@ A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML im
 - **Batch actions**: select articles and mark them read, unread, bookmarked or delete them in one request.
 - **Tunable appearance**: accent colour and list density are switchable from the sidebar and remembered per browser.
 - **Single JS module**: all interactive behaviour now lives in `app/static/app.js`, so templates stay declarative.
+- **Language switcher**: every page has a visible 中文 / English switch that remembers your choice in a cookie.
+- **Fully localised controls**: the file-upload button is drawn by the app, so it follows the interface language instead of the browser's.
+- **Sorting**: order the list by newest, oldest or feed.
+- **Keyword muting**: hide noisy items by comma-separated keywords, combinable with search and every other filter.
 - **Light and dark themes**: the web UI follows your system preference automatically and can be switched manually; the choice is remembered per browser.
 - **Bookmarks**: star any article and filter to bookmarked items only, straight from the web interface.
 - **Data export**: download your articles as JSON (full backup), CSV (opens in Excel) or Markdown (reading archive).
@@ -126,6 +130,7 @@ rss_aggregator/
 │   ├── test_v208_bugs.py      # v2.0.8 API, SSE, infinite scroll and fixes (15 cases)
 │   ├── test_v209_bugs.py      # v2.0.9 sidebar views, batch actions and appearance (14 cases)
 │   ├── test_v2091_palette.py  # v2.0.9 regression: command palette must be closable (5 cases)
+│   ├── test_v210_bugs.py      # v2.1.0 language switch, file picker, sorting and muting (16 cases)
 │   ├── test_e2e_smoke.py      # End-to-end smoke test (starts a real server)
 │   └── test_debug_reloader.py # Verifies the scheduler starts only once under --debug
 ├── main.py                  # Web entry point

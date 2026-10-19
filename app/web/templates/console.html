@@ -23,8 +23,12 @@
     </div>
     <div class="row" style="margin-top:10px">
         <form action="{{ url_for('web.import_opml_route') }}" method="post" enctype="multipart/form-data" class="row">
-            <input type="file" name="opml_file" accept=".opml,.xml" required>
-            <button type="submit">{{ _('import_opml') }}</button>
+            <label class="file-picker">
+        <input type="file" name="opml_file" accept=".opml,.xml" required class="file-input">
+        <span class="file-button">{{ _('choose_file') }}</span>
+        <span class="file-name" data-file-name>{{ _('no_file_chosen') }}</span>
+    </label>
+        <button type="submit" >{{ _('import_opml') }}</button>
         </form>
     </div>
 </section>

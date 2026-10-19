@@ -65,8 +65,20 @@ web_bp.before_request(check_csrf_origin)
 # --------------------------------------------------------------------------- #
 # 辅助函数
 # --------------------------------------------------------------------------- #
+LANG_COOKIE = "rss_lang"
+SUPPORTED_LANGS = ("zh", "en")
+
+
 def _language():
-    return request.args.get("lang") or current_app.config.get("APP_LANGUAGE", "en")
+    """语言优先级：URL 参数 > cookie（用户上次选择）> 配置默认值。"""
+    explicit = (request.args.get("lang") or "").strip().lower()
+    if explicit in SUPPORTED_LANGS:
+        return explicit
+    remembered = (request.cookies.get(LANG_COOKIE) or "").strip().lower()
+    if remembered in SUPPORTED_LANGS:
+        return remembered
+    configured = str(current_app.config.get("APP_LANGUAGE", "en")).lower()
+    return configured if configured in SUPPORTED_LANGS else "en"
 
 
 VIEWS = ("all", "unread", "starred", "today")
@@ -207,6 +219,15 @@ def _thumbnail_helper():
         return first_image(article.content) or first_image(article.summary)
 
     return _thumb
+
+
+def _excluded_terms():
+    """屏蔽关键词：来自 URL 参数或配置（config: app.exclude_keywords）。"""
+    raw = request.args.get("exclude")
+    if raw is None:
+        configured = current_app.config.get("APP_EXCLUDE_KEYWORDS") or ""
+        raw = configured if isinstance(configured, str) else ", ".join(configured)
+    return [item.strip() for item in str(raw).replace("，", ",").split(",") if item.strip()]
 
 
 def _categories():
@@ -482,10 +503,20 @@ def index():
     view = (request.args.get("view") or "all").lower()
     if view not in VIEWS:
         view = "all"
-    articles = (
-        _view_query(view)
-        .order_by(Article.published.desc(), Article.id.desc())
-        .paginate(page=max(1, page), per_page=PER_PAGE, error_out=False)
+    sort = (request.args.get("sort") or "newest").strip()
+    exclude = _excluded_terms()
+    base = _view_query(view)
+    for word in exclude:
+        if word:
+            base = base.filter(~Article.title.contains(word))
+    if sort == "oldest":
+        ordering = (Article.published.asc(), Article.id.asc())
+    elif sort == "source":
+        ordering = (Article.source_id.asc(), Article.published.desc(), Article.id.desc())
+    else:
+        ordering = (Article.published.desc(), Article.id.desc())
+    articles = base.order_by(*ordering).paginate(
+        page=max(1, page), per_page=PER_PAGE, error_out=False
     )
     return render_template(
         "index.html",
@@ -500,10 +531,12 @@ def search():
     unread = request.args.get("unread", "false").lower() == "true"
     bookmarked = request.args.get("bookmarked", "false").lower() == "true"
     category = (request.args.get("category") or "").strip()
+    sort = (request.args.get("sort") or "newest").strip()
+    exclude = _excluded_terms()
     page = request.args.get("page", 1, type=int) or 1
     pagination = search_articles(
         query, source_id, unread, page=page, per_page=PER_PAGE, bookmarked_only=bookmarked,
-        category=category,
+        category=category, exclude=exclude, sort=sort,
     )
     return render_template(
         "index.html",
@@ -515,6 +548,8 @@ def search():
             search_unread=unread,
             search_bookmarked=bookmarked,
             search_category=category,
+            search_sort=sort,
+            search_exclude=", ".join(exclude),
         )
     )
 
@@ -733,6 +768,24 @@ def stats_page():
             sources=stats.source_breakdown(),
         )
     )
+
+
+@web_bp.route("/language/<lang>")
+def set_language(lang):
+    """切换界面语言：写入 cookie 后跳回原页面（保留其它查询条件）。"""
+    from flask import make_response
+
+    target = lang if lang in SUPPORTED_LANGS else "en"
+    # 优先跳回来源页（保留筛选），否则回首页
+    destination = request.args.get("next") or request.referrer or url_for("web.index")
+    destination = _local_redirect(destination, url_for("web.index"))
+
+    response = make_response(redirect(destination))
+    response.set_cookie(
+        LANG_COOKIE, target,
+        max_age=60 * 60 * 24 * 365, samesite="Lax", httponly=False,
+    )
+    return response
 
 
 @web_bp.route("/healthz")

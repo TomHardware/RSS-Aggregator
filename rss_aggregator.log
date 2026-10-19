@@ -1,0 +1,95 @@
+2026-10-19 13:19:52,966 - app - WARNING - 未配置 app.secret_key / SECRET_KEY，已生成临时密钥；重启后登录状态与 flash 消息会失效，生产环境请在 config.yaml 中显式配置
+2026-10-19 13:19:53,835 - app - WARNING - 登录鉴权未启用：请在 config.yaml 里设置 auth.password_hash（生成方式：python -m app.auth <password>），或设置环境变量 RSS_AGGREGATOR_PASSWORD。当前任何人都能访问本服务。
+2026-10-19 13:19:55,900 - app.scheduler - INFO - 调度器时区已设为 Asia/Shanghai
+2026-10-19 13:19:56,044 - apscheduler.scheduler - INFO - Scheduler started
+2026-10-19 13:19:56,804 - app.scheduler - INFO - 调度器已启动，共注册 0 个源
+2026-10-19 13:19:56,805 - __main__ - INFO - RSS Aggregator 2.1.0 已启动（https://github.com/forestwolf-ai/RSS-Aggregator）
+2026-10-19 13:19:56,882 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.2.107:5000
+2026-10-19 13:19:56,890 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-10-19 13:19:59,323 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:19:59] "GET / HTTP/1.1" 200 -
+2026-10-19 13:19:59,625 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:19:59] "GET /static/app.css HTTP/1.1" 200 -
+2026-10-19 13:19:59,689 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:19:59] "GET /static/theme.js HTTP/1.1" 200 -
+2026-10-19 13:19:59,742 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:19:59] "GET /static/app.js HTTP/1.1" 200 -
+2026-10-19 13:20:00,320 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:00] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:00,356 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:00] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-10-19 13:20:03,485 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:03] "[32mGET /language/zh?next=/ HTTP/1.1[0m" 302 -
+2026-10-19 13:20:03,506 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:03] "GET / HTTP/1.1" 200 -
+2026-10-19 13:20:03,582 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:03] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:03,605 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:03] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:03,621 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:03] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:03,858 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:03] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:06,539 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:06] "[32mGET /language/en?next=/ HTTP/1.1[0m" 302 -
+2026-10-19 13:20:06,590 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:06] "GET / HTTP/1.1" 200 -
+2026-10-19 13:20:06,750 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:06] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:06,793 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:06] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:06,823 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:06] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:07,103 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:07] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:09,815 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:09] "[32mGET /language/zh?next=/ HTTP/1.1[0m" 302 -
+2026-10-19 13:20:09,870 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:09] "GET / HTTP/1.1" 200 -
+2026-10-19 13:20:10,022 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:10] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:10,026 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:10] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:10,170 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:10] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:10,290 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:10] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:14,792 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:14] "GET /?view=today HTTP/1.1" 200 -
+2026-10-19 13:20:14,911 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:14] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:14,942 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:14] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:14,969 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:14] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:15,072 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:15] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:16,783 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:16] "GET /?view=starred HTTP/1.1" 200 -
+2026-10-19 13:20:16,848 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:16] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:16,889 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:16] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:16,944 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:16] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:17,029 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:17] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:17,948 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:17] "GET /?view=unread HTTP/1.1" 200 -
+2026-10-19 13:20:18,054 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:18] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:18,075 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:18] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:18,102 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:18] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:18,258 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:18] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:18,915 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:18] "GET / HTTP/1.1" 200 -
+2026-10-19 13:20:19,064 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:19] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:19,088 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:19] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:19,119 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:19] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:19,275 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:19] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:20,254 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:20] "GET /?view=today HTTP/1.1" 200 -
+2026-10-19 13:20:20,393 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:20] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:20,436 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:20] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:20,446 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:20] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:20,543 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:20] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:26,443 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:26] "GET /?view=unread HTTP/1.1" 200 -
+2026-10-19 13:20:26,542 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:26] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:26,556 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:26] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:26,583 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:26] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:26,698 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:26] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:27,304 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:27] "GET /?view=starred HTTP/1.1" 200 -
+2026-10-19 13:20:27,439 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:27] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:27,443 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:27] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:27,478 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:27] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:27,572 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:27] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:28,232 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:28] "GET / HTTP/1.1" 200 -
+2026-10-19 13:20:28,303 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:28] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:28,310 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:28] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:28,357 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:28] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:28,498 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:28] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:29,414 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:29] "GET /?view=unread HTTP/1.1" 200 -
+2026-10-19 13:20:29,540 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:29] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:29,559 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:29] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:29,592 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:29] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:30,082 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:30] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:30,261 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:30] "GET /?view=starred HTTP/1.1" 200 -
+2026-10-19 13:20:30,352 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:30] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:30,369 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:30] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:30,492 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:30] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:30,658 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:30] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:31,542 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:31] "GET /?view=unread HTTP/1.1" 200 -
+2026-10-19 13:20:31,645 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:31] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:31,653 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:31] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:31,684 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:31] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:31,777 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:31] "GET /api/events HTTP/1.1" 200 -
+2026-10-19 13:20:32,297 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:32] "GET / HTTP/1.1" 200 -
+2026-10-19 13:20:32,367 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:32] "[36mGET /static/app.css HTTP/1.1[0m" 304 -
+2026-10-19 13:20:32,421 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:32] "[36mGET /static/theme.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:32,451 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:32] "[36mGET /static/app.js HTTP/1.1[0m" 304 -
+2026-10-19 13:20:32,579 - werkzeug - INFO - 127.0.0.1 - - [19/Oct/2026 13:20:32] "GET /api/events HTTP/1.1" 200 -
