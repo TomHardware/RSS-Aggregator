@@ -8,6 +8,44 @@
 
 ---
 
+## [2.1.1] - 2026-10-20
+
+视图与观感版本：每个视图拥有独立的视觉身份，切换时整块工作区随之变化，并清理了误提交的运行时产物。
+View and polish release: each view gains its own visual identity so switching transforms the whole workspace, and stray runtime artefacts were removed.
+
+### 新增功能 / Added
+
+- **视图各有身份**：切换「全部 / 未读 / 收藏 / 今天」时，主区域顶部会换成对应图标、标题、说明与计数。
+- *Views have their own identity: switching between All, Unread, Bookmarks and Today swaps the icon, heading, description and count at the top of the main area.*
+- 每个视图有各自的色调——全部为蓝紫、未读为蓝色、收藏为琥珀、今天为青绿，强调色会贯穿按钮与未读圆点。
+- *Each view has its own colour tone — blue-violet for All, blue for Unread, amber for Bookmarks and teal for Today — and the accent carries through buttons and unread dots.*
+- 切换视图时 hero 会有一段很短的入场动画，明确告诉用户「换到了另一个地方」。
+- *Switching views plays a short entrance animation on the hero, making it obvious that you moved somewhere else.*
+- **个性化空状态**：不同视图没有内容时给不同的图形与提示语。
+- *Per-view empty states: each view shows its own illustration and guidance when it has nothing to display.*
+- **筛选标签**：当前生效的搜索词、分类、屏蔽词与来源都会显示为标签，点一下即可移除。
+- *Active filter chips: the current search term, category, muted keywords and feed all appear as chips that can be removed with one click.*
+- 视图内的强调色、悬停色与卡片描边都会跟随视图色调，整体观感保持统一。
+- *Accents, hover colours and card outlines inside a view follow that view's tone, keeping the whole surface coherent.*
+
+### 修复 / Fixed
+
+- **切换视图后主界面几乎没有变化**：原来只替换列表内容，标题永远写着 Articles，配色与空状态也不变，用户没有切换感。
+- *Switching views barely changed the main area: only the list was replaced, the heading always said Articles, and neither the palette nor the empty state changed, so it never felt like a different place.*
+- **运行时产物再次被提交**：`app/__pycache__/` 下 20 个字节码文件与 `data/rss.db` 混进了版本库，现已从仓库删除。
+- *Runtime artefacts were committed again: twenty bytecode files under `app/__pycache__/` plus `data/rss.db` slipped into the repository and have been removed.*
+- 打包检查已覆盖这类文件，后续提交会被测试拦住。
+- *Packaging checks now cover these files, so future commits are blocked by the tests.*
+
+### 兼容性 / Compatibility
+
+- 数据库结构不变，无需迁移。
+- *The database schema is unchanged, so no migration is needed.*
+- 未引入任何第三方依赖。
+- *No third-party dependency was added.*
+- 新增 `test_v211_bugs.py`（12 例），覆盖视图身份与仓库卫生。
+- *Adds `test_v211_bugs.py` with 12 cases covering view identity and repository hygiene.*
+
 ## [2.1.0] - 2026-10-18
 
 语言与筛选版本：补回语言切换并让控件彻底本地化，新增排序与关键词屏蔽。

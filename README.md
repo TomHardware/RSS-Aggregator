@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README-zh.md)
 
-**Current version: 2.1.0** &nbsp;·&nbsp; `/healthz` reports it too.
+**Current version: 2.1.1** &nbsp;·&nbsp; `/healthz` reports it too.
 
 A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML import/export, full-text extraction, search, email notifications, and a bilingual web interface. Ideal for personal or team use in information aggregation, content monitoring, and reading management.
 
@@ -50,6 +50,8 @@ A feature-rich, self-hosted RSS feed aggregator with scheduled fetching, OPML im
 - **Fully localised controls**: the file-upload button is drawn by the app, so it follows the interface language instead of the browser's.
 - **Sorting**: order the list by newest, oldest or feed.
 - **Keyword muting**: hide noisy items by comma-separated keywords, combinable with search and every other filter.
+- **Views with their own identity**: switching between All, Unread, Bookmarks and Today changes the icon, heading, description, count and colour tone of the whole workspace.
+- **Active filter chips**: every applied filter appears as a removable chip, so the current context is always visible.
 - **Light and dark themes**: the web UI follows your system preference automatically and can be switched manually; the choice is remembered per browser.
 - **Bookmarks**: star any article and filter to bookmarked items only, straight from the web interface.
 - **Data export**: download your articles as JSON (full backup), CSV (opens in Excel) or Markdown (reading archive).
@@ -131,6 +133,7 @@ rss_aggregator/
 │   ├── test_v209_bugs.py      # v2.0.9 sidebar views, batch actions and appearance (14 cases)
 │   ├── test_v2091_palette.py  # v2.0.9 regression: command palette must be closable (5 cases)
 │   ├── test_v210_bugs.py      # v2.1.0 language switch, file picker, sorting and muting (16 cases)
+│   ├── test_v211_bugs.py      # v2.1.1 per-view identity, filter chips and repo hygiene (12 cases)
 │   ├── test_e2e_smoke.py      # End-to-end smoke test (starts a real server)
 │   └── test_debug_reloader.py # Verifies the scheduler starts only once under --debug
 ├── main.py                  # Web entry point
